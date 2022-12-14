@@ -1,3 +1,3 @@
 # INITIALIZATION FILE
-from main import Web
-from main import Code
+from CBPL.src.main import Web
+from CBPL.src.main import Code
