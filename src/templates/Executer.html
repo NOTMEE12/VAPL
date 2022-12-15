@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>CBCL - {{NAME}}</title>
+	<link rel="stylesheet" href="/src/static/styles/mainpage.css">
+	<link rel=stylesheet href= "{{ url_for('static',filename='styles/mainpage.css') }}">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+</head>
+<style>
+	#phase {
+		margin-top: 20%;
+	}
+	#TEXT {
+		margin-top: 120px;
+		font-size: 56;
+		color: royalblue;
+		transition: text 0.2 linear;
+	}
+	.block {
+		display: inline;
+		margin-left: 25px;
+		margin-right: 25px;
+		background-color: blueviolet;
+		padding: 10px 20px 0px 20px;
+		transition: padding 0.2s linear;
+	}
+	.command-block {
+		margin-left: 25px;
+		margin-right: 25px;
+		border-radius: 7px;
+		border-color: blue;
+		background-color: black;
+		padding-left: 50px;
+		padding-right: 50px;
+		transition: padding 0.2s linear;
+		float: left;
+		color: skyblue;
+		text-align: center;
+		font-family: monospace;
+		font-size: 72;
+		padding-bottom: 50px;
+	}
+	.command-block a {color: dodgerblue}
+	.command-block a2 {color: deepskyblue}
+	.command-block h1 {text-align: center; padding-bottom: 15px;}
+	.code-output {
+		padding-top: 25px;
+		margin-left: 25px;
+		margin-right: 25px;
+		border-radius: 7px;
+		border: 2px;
+		border-color: green;
+		background-color: black;
+		padding-left: 50px;
+		padding-right: 50px;
+		transition: padding 0.2s linear;
+		float: left;
+		color: greenyellow;
+		text-align: center;
+		font-family: monospace;
+		font-size: 72;
+		padding-bottom: 50px;
+	}
+</style>
+<body>
+	<div class="GET">
+		<a id="GET-TEXT" hidden>{{text}}</a>	
+	</div>
+	<div id="phase">
+		<div class="block"></div>
+		<div class="block"></div>
+		<div class="block"></div>
+		<div class="block"></div>
+		<div class="block"></div>
+		<h3 id="TEXT"></h3>
+	</div>
+	<div class="command-block">
+		<h1>COMMANDS</h1>
+		{{COMMANDS}}<br>
+		TEKST <a>PARAMATER WYMAGANY</a><a2> PARAMATER OPCJONALNY</a2>
+	</div>
+	<div class="code-output">
+		<a id="OUT-TEXT"></a>
+	</div>
+</body>
+<script type="text/javascript">
+	const blocks = document.getElementsByClassName('block')
+	GET_TEXT = document.getElementById('GET-TEXT').innerHTML
+	TEXT_OUT = document.getElementById('text')
+	const code = document.getElementById('code')
+	
+	
+	function randomize(){
+		function randomi(){
+			for(let i = 0; i < blocks.length; i++){
+				blocks[i].style.paddingTop = blocks[i].style.paddingBottom = String(Math.random() * 100) + "px"
+			}
+		}
+		setInterval(randomi, 200)
+	}
+	randomize()
+
+	
+	function SetText() {
+		let showText = function (target, message, index, interval) {	
+			if (index < message.length) {
+				$(target).append(message[index++]);
+				setTimeout(function () { 
+					showText(target, message, index, interval); }, interval)
+			}
+		}
+		$(function () {
+			document.getElementById('TEXT').innerHTML = ''
+			showText("#TEXT", GET_TEXT, 0, 100)
+			getSpeech()
+		})
+	}
+	
+	SetText()
+	
+	function getSpeech() {
+		let SpeechRecognition = window.webkitSpeechRecognition
+		
+		let recognition = new SpeechRecognition()
+		
+		recognition.continous = true
+		
+		recognition.onresult = function (event) {
+			let current = event.resultIndex
+			
+			let text = event.results[current][0].transcript
+			
+			console.log(text)
+			
+			return text
+		}
+		recognition.onstart = function() {}
+		recognition.onspeechend = function() {
+			return getSpeech()
+		}
+		recognition.onerror = function(event) {
+			if(event.error == 'no-speech') {
+				return getSpeech()
+			}
+		}
+		recognition.start()
+		update()
+	}
+	
+	
+	$(function () {
+			showText("#OUT-TEXT", GET_TEXT, 0, 100)
+		}
+	)
+	
+</script>
+</html>

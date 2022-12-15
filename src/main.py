@@ -22,13 +22,16 @@ class Code:
 							'if': 'if',
 							'else': 'else',
 							'then': 'then',
+							'module': '#INC',
 							'1-line_comment_start': '%:',
 							'm-line_comment_start': '%=',
 							'm-line_comment_end': '=%',
+							'path-line-start': '/*',
+							'path-line-end': '*/'
 							}
 		self.globals = {'execute': self.run, 'eval': self.eval}
 		self.locals = {}
-
+		self.modules = []
 
 		class BasicError:
 			def __init__(self, line_number, name, context, STOPCODE):
@@ -94,7 +97,7 @@ class Code:
 			PARAMS = line.split('(')[0].split(')')[1]
 			CODE = line.split('{')[1]
 			while "{" not in CODE or "}" not in CODE or CODE.count('{') != CODE.count('}'):
-				CODE += self.NextLine()
+				CODE += "\n" + self.NextLine()
 			CODE.rstrip('}')
 
 			CONVERT = ""
@@ -107,7 +110,8 @@ class Code:
 			f"""
 			def {NAME} (*PARS):
 			\t{CONVERT}
-			\texecute({CODE})
+			\tfor line in str(CODE).split('\n'):
+			\t\texecute(line)
 			\t{DECONVERT}	
 			"""
 			self.exec(BASE_FUNCTION)
@@ -121,15 +125,19 @@ class Code:
 			STATEMENT = line[line.find(self.declaration['if'])+len(self.declaration['if']):line.find(')')+1]
 			CODE = line.split('{')[1]+ "{"
 			while "{" not in CODE or "}" not in CODE or CODE.count('{') != CODE.count('}'):
-				CODE += self.RemoveSpacesAndTabs(self.NextLine())
+				CODE += "\n" + self.RemoveSpacesAndTabs(self.NextLine())
 			CODE = CODE.lstrip("{").rstrip("}")
 
 			if self.eval(STATEMENT):
-				self.execute_line(CODE)
+				for line in str(CODE).split('\n'):
+					self.execute_line(line)
 
 		elif self.declaration['print'] in first:
 			PRINT = self.RemoveSpacesAndTabs(line).lstrip(self.declaration['print']).lstrip(':')
 			print(self.eval(PRINT))
+
+	def getCommands(self):
+		return self.paths
 
 	def RemoveSpacesAndTabs(self, text: str):
 		"""Removes spaces and tabs from the start of the string"""
@@ -182,8 +190,24 @@ class Web:
 		self.app.run(host=host, port=port, debug=debug)
 
 	def run(self, host, port, debug: bool=False, HTML_PAGE=""):
-		@self.app.route('/', methods=['get', 'post'])
+		code = str(request.form['code'])
+		print(code)
+		old_stdout = sys.stdout  # Memorize the default stdout stream
+		sys.stdout = buffer = StringIO()
+		try:
+			self.code.setup_new_code(code)
+			self.code.run()
+		except:
+			print("Err: " + str(self.code.line_number), str(), sep="=:")
+		sys.stdout = old_stdout  # Put the old stream back in place
+		whatWasPrinted = buffer.getvalue()
+		PRE_COMMANDS = self.code.getCommands()
+		COMMANDS = ""
+		for command in PRE_COMMANDS:
+			COMMANDS += command.replace(':', '<a>').replace(';', '</a>').replace('--', '<a2>').replace('-', '</a2>')
+
+		@self.app.route('/', methods=['GET', 'POST'])
 		def execute():
-			return render_template()
+			return render_template(HTML_PAGE, output=whatWasPrinted, COMMANDS=COMMANDS)
 
 		self.app.run(host=host, port=port, debug=debug)
