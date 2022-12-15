@@ -26,7 +26,7 @@ pip install CBPL
 
 ## CODE EXAMPLE
 ```python
-import CBPL.src as CBPL
+import CBPL as CBPL
 web = CBPL.Web(False)
 web.run_tutorial('0.0.0.0', 81)
 ```
