@@ -1,0 +1,111 @@
+body {
+	margin: 0px;
+	padding: 0px;
+	background-color: #222222; /* VERY DARK GRAY */
+	color: #c2c2c7;
+	text-align: center;
+}
+a {
+	color: #c2c2c7;
+}
+
+.docs {
+	/* DISPLAY */
+	align-content: center;
+	display: block;
+	height: 90vh;
+	width: 190px;
+	position: relative;
+	float: left;
+	background-color: #424242; /* DARK GRAY */
+	color: #c2c2c7; /* WHITE*/
+	/* TEXT */
+	text-align: center;
+	font-family: sans-serif;
+	font-size: 56;
+	/* ANIMATIONS */
+	transition: all 0.5s ease;
+	overflow: hidden;
+	padding-left: 15;
+}
+.docs:hover {
+	margin-left: 15px;
+	transform: scaleX(1.16314789371); /* MAKE IT 240 PX */
+	font-size: 56;
+}
+.code {
+	margin-left: 240px;
+	color: #c2c2c7; /* WHITE */
+	border: 0px;
+}
+
+#code {
+	font-size: 56;
+	text-align: left;
+	background-color: darkgrey;
+	border: 0px;
+	outline: none;
+}
+.HEADER {
+	background-color: #7c7c7c;
+	text-align: center;
+	color: #c2c2c7;
+	width: calc(100%)
+}
+#CodeTest {
+	margin: 0px;
+	align-items: center;
+	text-align: center;
+	border-radius: 25px;
+	margin-top: 25px;
+	/* background-color: deepskyblue; GRAY */
+	color: #CCCCCC;
+	width: 70%vw;
+	height: 20%vh;
+	float: center;
+	overflow: hidden;
+}
+
+.ERROR {
+	background-color: red; /* GRAY */
+}
+.NO-ERROR {
+	background-color: darkgreen; /* GRAY */
+}
+
+#Console {
+	align-items: center;
+	align-content: center;
+	resize: none;
+	background-color: darkgrey;
+	font-family: monospace;
+	font-size: 56;
+}
+.Console-liner {
+	align-items: center;
+	float: left;
+	text-align: left;
+	align-content: center;
+	resize: none;
+	background-color: darkgrey;
+	font-family: monospace;
+	font-size: 56;
+ 	color: black;
+	padding-left: 40px;
+	padding-right: 30px;
+	margin-left: 240px;
+	border-top: 2px;
+}
+
+.ORANGE {
+  color: orangered;
+}
+.PURPLE {
+  color: rebeccapurple;
+}
+.GRAY {
+  color: black;
+}
+.GREEN {
+  color: seagreen;
+}

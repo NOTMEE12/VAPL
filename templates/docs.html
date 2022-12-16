@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <title> CBCL - Docs</title>
+    <link rel=stylesheet href= "{{ url_for('static',filename='styles/mainpage.css') }}">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="{{ url_for('static',filename='code.js') }}"></script>
+  </head>
+  <body>
+    <div id="MainInfo">
+      <h1 class="HEADER"> <strong>O języku</strong></h1>
+      <h4> CBCL - mój własny język programowania</h4>
+      <h4> Został swtorzony z chęcią ułatwienia programowania asystentów głosowych</h4>
+      <h4> Jego kod źródłowy został zrobiony w ok. 2 tygodnie. </h4>
+      <h4> Kod, który programujesz na tej stronie jest lekko zmodyfikowany</h4>
+      <h4> Przykładowa zmiany: </h4>
+      <ul>
+        <li>Funkcje można aktywować po prostu wpisują nazwę i parametry zamiast 'call'</li>
+      </ul>
+    </div>
+    <div id="Zmienne">
+      <h1 class= "HEADER"> VAR </h1>
+      <h2> <strong>Zmienne</strong> to sposób zapisywania danych</h2>
+      <h4> Dzielą się na typy: </h4>
+      <h4> - Int - Integer - Zapisuje liczby całkowite - 1, 2, 543</h4>
+      <h4> - Str - String - Zapisuje text - "hejoł", '???'</h4>
+      <h4 > - Bool - Boolean - Zapisuje prawdę lub fałsz - False, True</h4>
+      <h4> - Float - Float  - Zapisuje liczby z . - 1.01, 562.432</h4>
+      <h4> nie można wykonywać działań na dwóch różnych rodzajach zmiennych - "1" + 1.0 -wyrzuci błąd</h4>
+      <h4> Typ zmiennych jest automatycznie ustawiony do wartości zmiennej</h4>
+      <h4> Aby zadeklarować zmienną trzeba napisać: </h4>
+      <textarea id="Console" readonly> var NAZWA = WARTOŚĆ</textarea>
+      <h4>Po deklaracji zmiennej można jej używać w działaniach matematycznych</h4><br>
+    </div>
+    <div id="out">
+      <h1 class="HEADER"> out</h1>
+      <h2><strong>out</strong> - wypisuje wynik z równania </h2>
+      <h4> przykład: 2-1==3 </h4>
+      <textarea id="Console" readonly cols=25> out: DZIAŁANIE/ZMIENNA </textarea>
+    </div>
+    <div id="if-else">
+      <h1 class="HEADER"><strong>If-Else</strong></h1>
+      <h4>If - służy do sprawdzania czy równanie jest prawdziwe lub zmienna typu bool jest True</h4>
+      <h4>Else - dodatek do If<br>Jeśli warunek If jest False to wtedy skrypt w Else jest użyty.</h4>
+    </div>
+    <div id="function">
+      <h1 class="HEADER"> <strong> Define</strong> - Funkcje</h1>
+      <h2> Jeśli będziesz powtarzał kod możesz go zawinąć w funckję.</h2>
+      <h2> Funkcja może przyjmować parametry które mogą się przydać do różnych obliczeń</h2>
+      <h2> Przykład kodu</h2>
+      <textarea id="Console" rows=1 cols=40>define SprawdzImie(Imie){out Imie}  </textarea>
+      <h2></h2>
+    </div>
+    <div id="call">
+      <h2 class="HEADER">CALL</h2>
+      <h4> za jej pomocą można aktywować funkcję</h4>
+      <h4> Pamiętaj że za pomocą call TRZEBA użyć "(" i ")"</h4>
+      <h3>Przykład kodu</h3>
+      <textarea id="Console" rows=1 cols=27>call SprawdzImie(PARAMETRY)</textarea>
+    </div>
+    <div id="DOLLAR-OPERATION">
+      <h1 class="HEADER">$</h1>
+      <h2>$ - operator, który zapisuje dane potrzebne do uruchomienia i otrzymania danych zwrotowych</h2>
+      <h3> Zapisuje: </h3>
+      <ul>
+        <li>NAME - str - imię asystenta</li>
+        <li></li>
+      </ul>
+    </div>
+    <div id="komentarz">
+      <h1 class="HEADER">%= =% %: - KOMENTARZE</h1>
+      <h2> Czym są?</h2>
+      <h3> Komentarz w skrypcie to tekst, który nie jest wykonywany</h3>
+      <h3> to jest "notatka" programisty</h3>
+      <h3> Dzięki niemu kod jest bardziej czytelny!</h3>
+      <h2> Komentarze jedno-liniowe</h2>
+      <h3> Komentarz jedno-liniowy (jak nazwa wskazuje) jest komentarzem, który działa tylko od znaku startu do końca linii!</h3>
+      <h3> Jego znak startu to: %: (TO ZNAK PROCENT:)</h3>
+      <h3> Przykład: </h3>
+      <textarea id="Console" cols=70 rows=3>%: out TO JEST KOD Z KOMENTARZEM ŻADEN OPERATOR TU NIE DZIAŁA
+out: TU JUŻ DZIAŁA'
+      </textarea>
+    </div>
+    <div id="Paths">
+      <h1 class="HEADER">PATHS</h1>
+      <h3> </h3>
+    </div>
+    <div id="Other"></div>
+    <div id="MainLanguage">
+      <h1 class="HEADER"> PYTHON! </h1>
+      <h3> To jest bardzo łatwy język programowania (jeśli umiesz płynieee angielski), który jest bardzo podobny do normalnego języka angielskiego</h3>
+      <h3> Cały ten język, który napisałem to głównie jest tylko aby mi się nie nudziło xD! </h3>
+    </div>
+    <h1 class="HEADER"> Co tu jeszcze robisz? Przeczytałeś już chyba WSZYSTKO! Leć programować!</h1>
+    <h1 class="HEADER"><a href="/"> KLIKNIJ TU ABY WRÓĆIĆ! </a></h1>
+  </body>
+</html>
