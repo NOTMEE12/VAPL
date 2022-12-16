@@ -1,5 +1,5 @@
 # CBPL
-### CBPL - programming language to easily make voice assistants in python using custom language made in it!
+### CBPL - programming language to easily make voice assistants in python!
 
 ### UNIQUE STYLE
 - VARIABLE - "var"
@@ -11,8 +11,9 @@
 - PATHS
 ### ABOUT PATHS
 - starts with /* and ends with */
-- Paths are just basically list of instructions
+- are basically list of instructions
 - when path is activated it will run code after ;>
+- example:
 ```
 var HELLO = "hello :NAME:"
 /*
