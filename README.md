@@ -22,7 +22,7 @@ var HELLO = "hello :NAME:"
 ```
 ## HOW TO INSTALL
 ```commandline
-pip install CBPL
+pip install VAPL
 ```
 
 ## CODE EXAMPLE
