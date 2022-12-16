@@ -14,7 +14,7 @@ class Code:
 			self.code = SCRIPT_OR_PATH
 
 		self.line_number = 0
-		self.declaration =	{
+		self.declaration = {
 							'function': 'define',
 							'variable': 'var',
 							'print': 'out',
@@ -22,16 +22,18 @@ class Code:
 							'if': 'if',
 							'else': 'else',
 							'then': 'then',
-							'module': '#INC',
-							'1-line_comment_start': '%:',
-							'm-line_comment_start': '%=',
-							'm-line_comment_end': '=%',
+							'module': '#Inlcude',
+							'1-line-comment-start': '%:',
+							'm-line-comment-start': '%=',
+							'm-line-comment-end': '=%',
 							'path-line-start': '/*',
 							'path-line-end': '*/'
-							}
-		self.globals = {'execute': self.run, 'eval': self.eval}
-		self.locals = {}
-		self.modules = []
+						   }
+		self.globals 	= {'execute': self.run, 'eval': self.eval}
+		self.locals 	= {}
+		self.modules 	= []
+		self.paths		= []
+		self.rawCode	= self.code
 
 		class BasicError:
 			def __init__(self, line_number, name, context, STOPCODE):
@@ -90,7 +92,18 @@ class Code:
 		return line
 
 	def execute_line(self, line: str):
-		"""DO NOT USE!!!"""
+		"""Do not use! It is only necessary to use in method run!\n When used inappropriately it can return lots of bugs!"""
+		def exclude_comments(text):
+			Start, End = self.declaration['m-line-comment-start'], self.declaration['m-line-comment-start']
+			output = sub("%s(.*?)%s" % (escape(Start.replace("\n", "/=n")), escape(End.replace("\n", "/=n"))), "",
+					text.replace("\n", "/=n")).replace("/=n", "\n")
+			Start = self.declaration['1-line-comment-start']
+			End = "\n"
+			output = sub("%s(.*?)%s" % (escape(Start.replace("\n", "/=n")), escape(End.replace("\n", "/=n"))), "",
+						 text.replace("\n", "/=n")).replace("/=n", "\n")
+			return output
+
+		line = exclude_comments(line)
 		first = line.split(" ")[0]
 		if self.declaration['function'] in first:
 			NAME = line.lstrip(self.declaration['function']).split(' ')[0]
@@ -122,14 +135,14 @@ class Code:
 			self.exec(f"{NAME} = {VALUE}")
 
 		elif self.declaration['if'] in first:
-			STATEMENT = line[line.find(self.declaration['if'])+len(self.declaration['if']):line.find(')')+1]
-			CODE = line.split('{')[1]+ "{"
-			while "{" not in CODE or "}" not in CODE or CODE.count('{') != CODE.count('}'):
-				CODE += "\n" + self.RemoveSpacesAndTabs(self.NextLine())
-			CODE = CODE.lstrip("{").rstrip("}")
+			statement = line[line.find(self.declaration['if'])+len(self.declaration['if']):line.find(')')+1]
+			code = line.split('{')[1] + "{"
+			while "{" not in code or "}" not in code or code.count('{') != code.count('}'):
+				code += "\n" + self.RemoveSpacesAndTabs(self.NextLine())
+			code = code.lstrip("{").rstrip("}")
 
-			if self.eval(STATEMENT):
-				for line in str(CODE).split('\n'):
+			if self.eval(statement):
+				for line in str(code).split('\n'):
 					self.execute_line(line)
 
 		elif self.declaration['print'] in first:
@@ -137,6 +150,7 @@ class Code:
 			print(self.eval(PRINT))
 
 	def getCommands(self):
+		"""get all possible commands! (usefully for debugging!)"""
 		return self.paths
 
 	def RemoveSpacesAndTabs(self, text: str):
@@ -147,6 +161,7 @@ class Code:
 class Web:
 
 	def __init__(self, connect_to_server: bool = False, code: Code = Code("")):
+		"""Flask object to run code, so you will just need to create code for assistant and save time."""
 		if connect_to_server is False:
 			self.app = Flask(__name__)
 			self.code = code
@@ -189,8 +204,8 @@ class Web:
 
 		self.app.run(host=host, port=port, debug=debug)
 
-	def run(self, host, port, debug: bool=False, HTML_PAGE=""):
-		code = str(request.form['code'])
+	def run(self, host, port, debug: bool=False, HTML_PAGE="Executer.html"):
+		code = str(self.code.rawCode)
 		print(code)
 		old_stdout = sys.stdout  # Memorize the default stdout stream
 		sys.stdout = buffer = StringIO()
