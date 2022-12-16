@@ -204,7 +204,7 @@ class Web:
 
 		self.app.run(host=host, port=port, debug=debug)
 
-	def run(self, host, port, debug: bool=False, HTML_PAGE="Executer.html"):
+	def run(self, host, port, debug: bool=False, HTML_PAGE="Executer.html", ssl_certificate=None):
 		code = str(self.code.rawCode)
 		print(code)
 		old_stdout = sys.stdout  # Memorize the default stdout stream
@@ -225,4 +225,4 @@ class Web:
 		def execute():
 			return render_template(HTML_PAGE, output=whatWasPrinted, COMMANDS=COMMANDS)
 
-		self.app.run(host=host, port=port, debug=debug)
+		self.app.run(host=host, port=port, debug=debug, ssl_context=ssl_certificate)

@@ -1,6 +1,5 @@
 [build-system]
 requires = [
-    "flask=>213",
     "setuptools>=42",
     "wheel"
 ]

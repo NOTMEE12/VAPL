@@ -26,8 +26,10 @@ pip install CBPL
 ```
 
 ## CODE EXAMPLE
+
 ```python
-import CBPL
-web = CBPL.Web(False)
+import VAPL
+
+web = VAPL.Web(False)
 web.run_tutorial('0.0.0.0', 81)
 ```
