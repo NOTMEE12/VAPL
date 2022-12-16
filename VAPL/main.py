@@ -26,8 +26,8 @@ class Code:
 							'1-line-comment-start': '%:',
 							'm-line-comment-start': '%=',
 							'm-line-comment-end': '=%',
-							'path-line-start': '/*',
-							'path-line-end': '*/'
+							'path-start': '/*',
+							'path-end': '*/'
 						   }
 		self.globals 	= {'execute': self.run, 'eval': self.eval}
 		self.locals 	= {}
@@ -104,8 +104,15 @@ class Code:
 			return output
 
 		line = exclude_comments(line)
-		first = line.split(" ")[0]
-		if self.declaration['function'] in first:
+		first = self.RemoveSpacesAndTabs(line).split(" ")[0]
+		line = self.RemoveSpacesAndTabs(line)
+		if self.declaration['path-start'] in first:
+			PATHS = line[:line.find(self.declaration['path-start'])]
+			while self.declaration['path-end'] not in PATHS:
+				PATHS += "\n" + self.NextLine()
+			PATHS = PATHS.rstrip(self.declaration['path-end'])
+			print(PATHS)
+		elif self.declaration['function'] in first:
 			NAME = line.lstrip(self.declaration['function']).split(' ')[0]
 			PARAMS = line.split('(')[0].split(')')[1]
 			CODE = line.split('{')[1]

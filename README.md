@@ -1,6 +1,6 @@
 # CBPL
-### CBPL - programming language to easily make voice assistants in python!
-
+CBPL - programming language to easily make voice assistants in python!
+----------------------------------------------------------------------
 ### UNIQUE STYLE
 - VARIABLE - "var"
 - FUNCTION - "define"
@@ -22,7 +22,7 @@ var HELLO = "hello :NAME:"
 ```
 ## HOW TO INSTALL
 ```commandline
-pip install VAPL
+pip install -i https://test.pypi.org/simple/ VAPL
 ```
 
 ## CODE EXAMPLE
