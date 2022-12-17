@@ -1,5 +1,5 @@
-# CBPL
-CBPL - programming language to easily make voice assistants in python!
+# VAPL
+VAPL - programming language to easily make voice assistants in python!
 ----------------------------------------------------------------------
 ### UNIQUE STYLE
 - VARIABLE - "var"
@@ -13,11 +13,12 @@ CBPL - programming language to easily make voice assistants in python!
 - starts with /* and ends with */
 - are basically list of instructions
 - when path is activated it will run code after ;>
+- uses strings (WHEN TEXT IS IN BETWEEN '(' AND ')' IT CAN BE USED AS VARIABLE IN CODE)
 - example:
 ```
-var HELLO = "hello :NAME:"
+var HELLO = "hello (NAME)"
 /*
-1.HELLO	;> out: "hello " + NAME + "!"
+HELLO	;> out: "hello " + NAME + "!"
 */
 ```
 ## HOW TO INSTALL
