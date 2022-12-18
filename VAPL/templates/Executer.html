@@ -41,22 +41,20 @@
 		transition: padding 0.2s linear;
 		float: center;
 		color: skyblue;
-		text-align: center;
+		text-align: left;
 		font-family: monospace;
 		font-size: 72;
 		padding-bottom: 50px;
 	}
-	.command-block a {color: dodgerblue}
-	.command-block a2 {color: deepskyblue}
+	.command-block a {color: deepskyblue}
 	.command-block h1 {text-align: center; padding-bottom: 15px;}
 	.code-output {
 		display: inline-block;
-		padding-top: 25px;
 		margin-left: 25px;
 		margin-right: 25px;
 		border-radius: 7px;
-		border: 2px;
 		border-color: green;
+		padding-top: 25px;
 		background-color: black;
 		padding-left: 50px;
 		padding-right: 50px;
@@ -75,8 +73,8 @@
 	}
 </style>
 <body>
-	<div class="GET">
-		<a id="GET-TEXT" hidden>{{text}}</a>	
+	<div class="GET" hidden>
+		<a id="GET-TEXT" hidden>{{text}}</a>
 	</div>
 	<div id="phase">
 		<div class="block"></div>
@@ -90,10 +88,11 @@
 	<div>
 		<div class="command-block">
 			<h1>COMMANDS</h1>
-			{{COMMANDS}}<br>
-			TEKST <a>PARAMATER WYMAGANY</a><a2> PARAMATER OPCJONALNY</a2>
+			<div id="OUT-CMD">{{COMMANDS.replace('&lt;', '<').replace('&gt;', '>') | safe}}</div>
+			<br>
+			TEKST <a> PARAMATER OPCJONALNY</a>
 		</div>
-		<div class="code-output" id="OUT-TEXT">
+		<div class="code-output">
 			<h1>OUTPUT</h1>
 			<a id="OUT-TEXT"></a>
 		</div>
@@ -162,6 +161,15 @@
 			listening = false
 			GET_TEXT = text
 			SetText()
+			$.Ajax({
+				'type': 'POST',
+				'url': '/cmd',
+				'data': {'TEXT': text},
+				'success': function(suc){
+				
+				}
+			})
+			
 			
 			console.log("REC stopped with text: " + text)
 			mic_img.src = on_img
