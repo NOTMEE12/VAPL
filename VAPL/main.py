@@ -16,7 +16,8 @@ import sys
 # Div-0 >> DivisionByZero		:> trying to divide number by zero
 ################
 # Exi-t >> GracefulExit			:> when interpreter ends interpreting or user calls `exit()`.
-
+################
+# Nam-E >> NameNotKnown			:> user tries to call
 
 class BasicError:
 	def __init__(self, line_number, BaseContext, STOPCODE, OptionalContext=None, name=None):
@@ -73,6 +74,9 @@ class GracefulExit(BasicError):
 	def __init__(self, num): super().__init__(num, "Exited gracefully", "Exi-t")
 
 
+class NameNotKnown(BasicError):
+	def __init__(self, num, name): super().__init__(num, f"Name not known", "Nam-E")
+
 class Code:
 	__slots__ = [
 		'code',
@@ -105,6 +109,7 @@ class Code:
 			'then': 'then',
 			'exit': 'exit',
 			'module': '#Inlcude',
+			'call': 'call',
 			'1-line-comment-start': '%:',
 			'm-line-comment-start': '%=',
 			'm-line-comment-end': '=%',
@@ -131,8 +136,9 @@ class Code:
 		if IS_PATH is True or IS_PATH == 1:
 			file = open(SCRIPT_OR_PATH, 'r')
 			self.code = file.read()
+			self.line_number = 0
 			file.close()
-			self.globals = {'execute': self.execute_line, 'eval': self.eval}
+			self.globals = {'execute': self.QuickSetupAndRun, 'eval': self.eval}
 			self.locals = {}
 		else:
 			self.code = SCRIPT_OR_PATH
@@ -140,6 +146,7 @@ class Code:
 	def QuickSetupAndRun(self, Code, IS_FILEPATH=False):
 		"""Setups new code, runs it and changes it back to old"""
 		OldCode = self.code
+		lineNumber = self.line_number
 		self.setup_new_code(Code, IS_FILEPATH)
 		self.run()
 		self.setup_new_code(OldCode)
@@ -169,7 +176,6 @@ class Code:
 					'param': PARAM,
 					'code': CODE
 				}
-				print(payload)
 				self.paths.append(payload)
 
 	def get_response(self, UserInput: str):
@@ -177,8 +183,10 @@ class Code:
 
 		UserInput = UserInput.lower()
 		HIGHEST = {'payload': None, 'r': 0}
-		MINIMUM = 50
+		MINIMUM = 80
 		for PATH in self.paths:
+			CMD_LEN = len(PATH['text'].split(' '))
+			UserInputCMD = UserInput.split(' ')[0: CMD_LEN]
 			R = match(UserInput, PATH['text'])
 			if R > HIGHEST['r']:
 				HIGHEST['payload'] = PATH
@@ -220,11 +228,13 @@ class Code:
 			GracefulExit(self.line_number + 2)
 
 	def exec(self, code):
-		exec(code, self.globals, self.locals)
-		return
+		try:
+			exec(code, self.globals, self.locals)
+		except NameError:
+			NameNotKnown(self.line_number, "")
 
 	def loop_for_more_context(self, text, char1, char2):
-		while char1 not in text or char2 not in text or text.count(char1) != text.count(char2):
+		while char1 not in text or char2 not in text and text.count(char1) != text.count(char2):
 			text += "\n" + self.RemoveSpacesAndTabs(self.next_line())
 		return text
 
@@ -241,12 +251,12 @@ class Code:
 		line = self.RemoveSpacesAndTabs(line)
 		if self.declaration['function'] in first:
 
-			NAME = line.lstrip(self.declaration['function']).split(' ')[0]
-			PARAMS = line.split('(')[0].split(')')[1]
+			NAME = line.split(self.declaration['function'])[1].split('(')[0]
+			PARAMS = line.split('(')[1].split(')')[0]
 			CODE = line.split('{')[1]
 
 			CODE = self.loop_for_more_context(CODE, '{', '}')
-			CODE.rstrip('}')
+			CODE.split('}')[0].rstrip('}')
 
 			CONVERT = ""
 			RECONVERT = ""
@@ -254,21 +264,18 @@ class Code:
 				for num, par in enumerate(PARAMS.split(',')):
 					CONVERT += f"{par} = PARS[{num}]"
 					RECONVERT += f"{par} = None"
-
 			BASE_FUNCTION = \
-				f"""
-			def {NAME} (*PARS):
-			\t{CONVERT}
-			\tfor line in str(CODE).split('\n'):
-			\t\texecute(line)
-			\t{RECONVERT}	
+			f"""def {NAME} (*PARS):\n  {CONVERT}\n  execute('''{CODE}''')\n  {RECONVERT}	
 			"""
+			print(BASE_FUNCTION)
 			self.exec(BASE_FUNCTION)
 
 		elif self.declaration['variable'] in first:
 			NAME = self.RemoveSpacesAndTabs(
 				self.RemoveSpacesAndTabs(line).lstrip(self.declaration['variable']).split("=")[0])
-			VALUE = self.eval(self.RemoveSpacesAndTabs(line).lstrip(self.declaration['variable']).split("=")[1])
+			VALUE = self.RemoveSpacesAndTabs(line).split("=")[1]
+			if self.RemoveSpacesAndTabs(VALUE) == "":
+				VALUE = ""
 			self.exec(f"{NAME} = {VALUE}")
 
 		elif self.declaration['if'] in first:
@@ -282,11 +289,18 @@ class Code:
 					self.execute_line(line)
 
 		elif self.declaration['print'] in first:
-			PRINT = self.RemoveSpacesAndTabs(line).lstrip(self.declaration['print']).lstrip(':')
+			PRINT = line.split(self.declaration['print'])[1].lstrip(':')
 			print("CODE  | ", self.eval(PRINT))
 
 		elif self.declaration['exit'] in first:
 			GracefulExit(self.line_number)
+
+		elif self.declaration['call'] in first:
+			FUNCTION = self.RemoveSpacesAndTabs(line.split(self.declaration['call'])[1].lstrip(':'))
+			self.exec(FUNCTION)
+
+		elif self.RemoveSpacesAndTabs(line) != "":
+			VSyntaxError(self.line_number, line)
 
 	def getCommands(self):
 		"""get all possible commands!"""
@@ -361,12 +375,18 @@ class Web:
 		sys.stdout = old_stdout  # Put the old stream back in place
 		whatWasPrinted = buffer.getvalue()
 		PRE_COMMANDS = self.code.getCommands()
-		COMMANDS = ""
+		COMMANDS = "<ul>"
 		for command in PRE_COMMANDS:
-			COMMANDS += command.replace(':', '<a>').replace(';', '</a>').replace('--', '<a2>').replace('-', '</a2>')
-
+			COMMANDS += '<li>' + command['text'] + '<a>' + command['param'] + '</a>' + '<br>'
+		COMMANDS += "</ul>"
 		@self.app.route('/', methods=['GET', 'POST'])
 		def execute():
-			return render_template(HTML_PAGE, output=whatWasPrinted, COMMANDS=COMMANDS)
+			return render_template(HTML_PAGE, output=whatWasPrinted, COMMANDS=str(COMMANDS))
+
+		@self.app.route('/cmd', methods=['GET', 'POST'])
+		def cmd():
+			TEXT = request.form['TEXT']
+			print(TEXT)
+			self.code.get_response(TEXT)
 
 		self.app.run(host=host, port=port, debug=debug, ssl_context=ssl_certificate)
