@@ -203,15 +203,15 @@ class Code:
 	def get_response(self, UserInput: str):
 		def match(text1, text2):
 			return int(SequenceMatcher(None, text1, text2).ratio() * 100)
-		UserInput = UserInput.lower()
+		UserInput = UserInput
 		HIGHEST = {'payload': None, 'r': 0}
-		MINIMUM = 60
-		self.debug_print()
+		MINIMUM = 90
+		self.debug_print("GETTING RESPONSE")
 		for PATH in self.paths:
 			CMD_LEN = len(PATH['text'].split(' '))
-			CMD = PATH['text'].lower()
-			UserInputCMD = ' '.join(UserInput.split(' ')[0: CMD_LEN - 1])
-			R = match(UserInputCMD, CMD)
+			CMD = PATH['text'].lower().rstrip().lstrip()
+			UserInputCMD = ' '.join(UserInput.split(' ')[0: CMD_LEN-1])
+			R = match(UserInputCMD.lower(), CMD)
 			self.debug_print(f'ratio of [\"{CMD}\"]/[\"{UserInputCMD}\"] is {R}', end="")
 			if R > HIGHEST['r']:
 				HIGHEST['payload'] = PATH
@@ -223,8 +223,9 @@ class Code:
 		if HIGHEST['r'] >= MINIMUM:
 			CMD_LEN = len(HIGHEST['payload']['text'].split(' '))
 			CMD = HIGHEST['payload']['text'].lower()
-			UserInputCMD = ' '.join(UserInput.split(' ')[CMD_LEN - 1: 0])
+			UserInputCMD = ''.join(UserInput.split(' ')[-CMD_LEN: 0])
 			INPUT_PARAM = '"' + UserInputCMD + '"'
+			print(f"INPUT_PARAM: |{INPUT_PARAM}| :")
 			if not INPUT_PARAM != "" and not HIGHEST['payload']['param'] != "":
 				print("Parameters not given.")
 				print("Try again.")
