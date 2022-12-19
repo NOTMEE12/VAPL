@@ -17,10 +17,11 @@ import sys
 ################
 # Exi-t >> GracefulExit			:> when interpreter ends interpreting or user calls `exit()`.
 ################
-# Nam-E >> NameNotKnown			:> user tries to call
+# Nam-E >> NameNotKnown			:> user tries to call but name of variable, function, etc. is not known.
 
 class BasicError:
-	def __init__(self, line_number, BaseContext, STOPCODE, OptionalContext=None, name=None):
+	def __init__(self, line_number, BaseContext, STOPCODE, OptionalContext=None, name=None, prefix="Error"):
+		self.prefix = prefix[0:5]
 		if OptionalContext is not None:
 			context = OptionalContext
 		else:
@@ -35,11 +36,13 @@ class BasicError:
 	def print_length(self):
 		LEN1 = len(self.__repr__().split('\n')[0])
 		LEN2 = len(self.__repr__().split('\n')[1])
-		if LEN1 > LEN2: print("Error | "+'-'*(LEN1-8))
-		else: 			print("Error | "+'-' * (LEN2-8))
+		if LEN1 > LEN2:
+			print(f"{self.prefix} | " + '-' * (LEN1 - 8))
+		else:
+			print(f"{self.prefix} | " + '-' * (LEN2 - 8))
 
 	def __repr__(self):
-		return f"\t{self.stop} | On line {self.num} happened: \n\t{self.stop} | {self.name} >> {self.cont}"
+		return f"{' '*8}{self.stop} | On line {self.num} happened: \n{' '*8}{self.stop} | {self.name} >> {self.cont}"
 
 
 class IllegalVariableName(BasicError):
@@ -67,15 +70,16 @@ class DivisionByZero(BasicError):
 
 
 class VSyntaxError(BasicError):
-	def __init__(self, num, context): super().__init__(num, "invalid Syntax", "Stx-E", "SyntaxError", context)
+	def __init__(self, num, context): super().__init__(num, "invalid Syntax", "Stx-E", context, "SyntaxError")
 
 
 class GracefulExit(BasicError):
-	def __init__(self, num): super().__init__(num, "Exited gracefully", "Exi-t")
+	def __init__(self, num): super().__init__(num, "Exited gracefully", "Exi-t", prefix="GEXIT")
 
 
 class NameNotKnown(BasicError):
 	def __init__(self, num, name): super().__init__(num, f"Name not known", "Nam-E")
+
 
 class Code:
 	__slots__ = [
@@ -87,18 +91,12 @@ class Code:
 		'modules',
 		'paths',
 		'rawCode',
-		'exit'
+		'exit',
+		'debug'
 	]
 
-	def __init__(self, SCRIPT_OR_PATH, IS_PATH: bool or int = False):
-		if IS_PATH is True or IS_PATH == 1:
-			file = open(SCRIPT_OR_PATH, 'r')
-			self.code = file.read()
-			file.close()
-		else:
-			self.code = SCRIPT_OR_PATH
-
-		self.line_number = 0
+	def __init__(self, SCRIPT_OR_PATH, IS_PATH: bool or int = False, debug=False):
+		self.setup_new_code(SCRIPT_OR_PATH, IS_PATH, debug)
 		self.declaration = {
 			'function': 'define',
 			'variable': 'var',
@@ -116,11 +114,6 @@ class Code:
 			'path-start': '/*',
 			'path-end': '*/'
 		}
-		self.globals = {'execute': self.run, 'eval': self.eval}
-		self.locals = {}
-		self.modules = []
-		self.paths = []
-		self.rawCode = self.code
 
 	def eval(self, expression):
 		try:
@@ -132,42 +125,67 @@ class Code:
 		except Exception as err:
 			EvaluationError(self.line_number, expression)
 
-	def setup_new_code(self, SCRIPT_OR_PATH, IS_PATH: bool or int = False):
+	def setup_new_code(self, SCRIPT_OR_PATH, IS_PATH: bool or int = False, debug=False):
+		def setup():
+			self.locals = {}
+			self.globals = {}
+			self.paths = []
+			self.modules = []
+			self.line_number = 0
+			self.debug = debug
+			def execute(src):
+				self.QuickSetupAndRun(src, AllowGracefulExit=False)
+
+			self.globals = {'execute': execute, 'eval': self.eval}
+			self.locals = {}
+
 		if IS_PATH is True or IS_PATH == 1:
 			file = open(SCRIPT_OR_PATH, 'r')
 			self.code = file.read()
-			self.line_number = 0
+			self.rawCode = self.code
 			file.close()
-			self.globals = {'execute': self.QuickSetupAndRun, 'eval': self.eval}
-			self.locals = {}
+			setup()
 		else:
 			self.code = SCRIPT_OR_PATH
+			self.rawCode = self.code
+			setup()
 
-	def QuickSetupAndRun(self, Code, IS_FILEPATH=False):
-		"""Setups new code, runs it and changes it back to old"""
+	def QuickSetupAndRun(self, Code, IS_FILEPATH=False, AllowGracefulExit=True):
+		"""
+		Setups new code, runs it and changes it back to old. \n
+		Difference is that it saves and runs new code WITH old globals and locals variables, functions, paths,  etc.
+		"""
+
 		OldCode = self.code
 		lineNumber = self.line_number
+		Globals, Locals = self.globals, self.locals
+		paths = self.paths
 		self.setup_new_code(Code, IS_FILEPATH)
-		self.run()
+		self.globals, self.locals = Globals, Locals
+		self.run(AllowGracefulExit)
 		self.setup_new_code(OldCode)
+		self.line_number = lineNumber
+		self.globals, self.locals = Globals, Locals
+		self.paths = paths
 
 	def configure_PATHS(self):
 		if self.declaration['path-start'] not in self.code: self.code += self.declaration['path-start']
 		if self.declaration['path-end'] not in self.code: self.code += self.declaration['path-end']
+		self.paths = []
 		START = self.code.find(self.declaration['path-start'])
 		END = self.code.find(self.declaration['path-end'], START) + 2
 		PATHS = self.code[START:END]
 		self.code = self.code.replace(PATHS, "")
 		PATHS = PATHS.replace(self.declaration['path-start'], "").replace(self.declaration['path-end'], "")
-		# ALL PATHS ARE COMPLETED AND DELETED FROM MAIN CODE
-		# NOW THEY WILL BE SAVED
+		# ALL PATHS ARE COMPLETED AND DELETED FROM MAIN CODE.
+		# NOW THEY WILL BE SAVED.
 		for PATH in PATHS.split('\n'):
 			PATH = self.RemoveSpacesAndTabs(PATH)
 			if PATH != "":
 				TEXT = PATH.split(';>')[0]
 				try: CODE = PATH.split(';>')[1]
 				except: CODE = ""
-				START = TEXT.find('(')+1
+				START = TEXT.find('(') + 1
 				END = TEXT.find(')', START)
 				PARAM = TEXT[START:END]
 				TEXT = TEXT.replace(f"({PARAM})", "")
@@ -178,31 +196,53 @@ class Code:
 				}
 				self.paths.append(payload)
 
-	def get_response(self, UserInput: str):
-		def match(text1, text2): return int(SequenceMatcher(None, text1, text2).ratio() * 100)
+	def debug_print(self, *values, sep="", end='\n'):
+		if self.debug: print(str(values).lstrip('(').rstrip(')').replace(',', sep)
+							 .lstrip("\'").lstrip('\"').rstrip("\'").rstrip('\"'), end)
 
+	def get_response(self, UserInput: str):
+		def match(text1, text2):
+			return int(SequenceMatcher(None, text1, text2).ratio() * 100)
 		UserInput = UserInput.lower()
 		HIGHEST = {'payload': None, 'r': 0}
-		MINIMUM = 80
+		MINIMUM = 60
+		self.debug_print()
 		for PATH in self.paths:
 			CMD_LEN = len(PATH['text'].split(' '))
-			UserInputCMD = UserInput.split(' ')[0: CMD_LEN]
-			R = match(UserInput, PATH['text'])
+			CMD = PATH['text'].lower()
+			UserInputCMD = ' '.join(UserInput.split(' ')[0: CMD_LEN - 1])
+			R = match(UserInputCMD, CMD)
+			self.debug_print(f'ratio of [\"{CMD}\"]/[\"{UserInputCMD}\"] is {R}', end="")
 			if R > HIGHEST['r']:
 				HIGHEST['payload'] = PATH
 				HIGHEST['r'] = R
+		self.debug_print()
+		self.debug_print(HIGHEST, sep="\n", end="")
+		self.debug_print(end="")
+		self.debug_print(self.paths, sep="\n", end="")
 		if HIGHEST['r'] >= MINIMUM:
-			INPUT_PARAM = '"' + UserInput.lower().replace(HIGHEST['payload']['text'].lower(), "")+'"'
+			CMD_LEN = len(HIGHEST['payload']['text'].split(' '))
+			CMD = HIGHEST['payload']['text'].lower()
+			UserInputCMD = ' '.join(UserInput.split(' ')[CMD_LEN - 1: 0])
+			INPUT_PARAM = '"' + UserInputCMD + '"'
 			if not INPUT_PARAM != "" and not HIGHEST['payload']['param'] != "":
 				print("Parameters not given.")
 				print("Try again.")
+				return "Parameters not given. Try again later with parameters!"
 			else:
 				INPUT_PARAM = self.eval(INPUT_PARAM)
+				old_stdout = sys.stdout  # Memorize the default stdout stream
+				sys.stdout = buffer = StringIO()
 				self.locals[HIGHEST['payload']['param']] = INPUT_PARAM
 				print("Executing command " + HIGHEST['payload']['text'])
 				self.execute_line(HIGHEST['payload']['code'])
+				sys.stdout = old_stdout  # Put the old stream back in place
+				whatWasPrinted = buffer.getvalue()
+				print(whatWasPrinted)
+				return whatWasPrinted
 		else:
 			print("No commands found")
+			return "No commands found"
 
 	def exclude_comments(self):
 		text = self.code
@@ -215,7 +255,7 @@ class Code:
 					 text.replace("\n", "/=n")).replace("/=n", "\n")
 		self.code = output
 
-	def run(self):
+	def run(self, AllowGracefulError=True):
 		"""Runs code from setup"""
 		self.exclude_comments()
 		self.configure_PATHS()
@@ -224,7 +264,7 @@ class Code:
 			line = self.code[self.line_number]
 			self.execute_line(line)
 			self.next_line()
-		if self.line_number + 1 == len(self.code):
+		if self.line_number + 1 == len(self.code) and AllowGracefulError:
 			GracefulExit(self.line_number + 2)
 
 	def exec(self, code):
@@ -234,8 +274,8 @@ class Code:
 			NameNotKnown(self.line_number, "")
 
 	def loop_for_more_context(self, text, char1, char2):
-		while char1 not in text or char2 not in text and text.count(char1) != text.count(char2):
-			text += "\n" + self.RemoveSpacesAndTabs(self.next_line())
+		while char1 not in text or char2 not in text or text.count(char1) != text.count(char2):
+			text += '\n' + self.RemoveSpacesAndTabs(self.next_line())
 		return text
 
 	def next_line(self):
@@ -243,7 +283,7 @@ class Code:
 		if self.line_number + 1 < len(self.code):
 			self.line_number += 1
 		line = self.code[self.line_number]
-		return line
+		return '\n' + line
 
 	def execute_line(self, line: str):
 		"""Do not use! It is only necessary to use in method run!\n When used inappropriately it can return lots of bugs!"""
@@ -253,29 +293,30 @@ class Code:
 
 			NAME = line.split(self.declaration['function'])[1].split('(')[0]
 			PARAMS = line.split('(')[1].split(')')[0]
-			CODE = line.split('{')[1]
+			CODE = '{' + line.split('{')[1]
 
 			CODE = self.loop_for_more_context(CODE, '{', '}')
-			CODE.split('}')[0].rstrip('}')
-
+			CODE = CODE.rstrip('}').lstrip('{')
 			CONVERT = ""
 			RECONVERT = ""
 			if self.RemoveSpacesAndTabs(PARAMS):
 				for num, par in enumerate(PARAMS.split(',')):
 					CONVERT += f"{par} = PARS[{num}]"
-					RECONVERT += f"{par} = None"
+					RECONVERT += f"del {par}"
 			BASE_FUNCTION = \
-			f"""def {NAME} (*PARS):\n  {CONVERT}\n  execute('''{CODE}''')\n  {RECONVERT}	
+				f"""def {NAME} (*PARS):\n  {CONVERT}\n  execute('''{CODE}''')\n  {RECONVERT}	
 			"""
-			print(BASE_FUNCTION)
 			self.exec(BASE_FUNCTION)
 
 		elif self.declaration['variable'] in first:
 			NAME = self.RemoveSpacesAndTabs(
 				self.RemoveSpacesAndTabs(line).lstrip(self.declaration['variable']).split("=")[0])
-			VALUE = self.RemoveSpacesAndTabs(line).split("=")[1]
-			if self.RemoveSpacesAndTabs(VALUE) == "":
-				VALUE = ""
+			if line.find("=") != -1:
+				VALUE = self.RemoveSpacesAndTabs(line).split("=")[1]
+				if self.RemoveSpacesAndTabs(VALUE) == "":
+					VALUE = None
+			else:
+				VALUE = None
 			self.exec(f"{NAME} = {VALUE}")
 
 		elif self.declaration['if'] in first:
@@ -379,6 +420,7 @@ class Web:
 		for command in PRE_COMMANDS:
 			COMMANDS += '<li>' + command['text'] + '<a>' + command['param'] + '</a>' + '<br>'
 		COMMANDS += "</ul>"
+
 		@self.app.route('/', methods=['GET', 'POST'])
 		def execute():
 			return render_template(HTML_PAGE, output=whatWasPrinted, COMMANDS=str(COMMANDS))
@@ -387,6 +429,6 @@ class Web:
 		def cmd():
 			TEXT = request.form['TEXT']
 			print(TEXT)
-			self.code.get_response(TEXT)
+			return self.code.get_response(TEXT)
 
 		self.app.run(host=host, port=port, debug=debug, ssl_context=ssl_certificate)

@@ -90,14 +90,15 @@
 			<h1>COMMANDS</h1>
 			<div id="OUT-CMD">{{COMMANDS.replace('&lt;', '<').replace('&gt;', '>') | safe}}</div>
 			<br>
-			TEKST <a> PARAMATER OPCJONALNY</a>
+			TEKST <a>PARAMETR</a>
 		</div>
 		<div class="code-output">
 			<h1>OUTPUT</h1>
 			<a id="OUT-TEXT"></a>
 		</div>
 	</div>
-<script type="text/javascript">
+	</body>
+	<script type="text/javascript">
 	const blocks 			= document.getElementsByClassName('block')
 	const TEXT_OUT 			= document.getElementById('TEXT')
 	const code 				= document.getElementById('code')
@@ -123,10 +124,11 @@
 	function Output(){
 		let showText = function (target, message, index, interval) {
 			if (index < message.length) {
-				$(target).append(message[index++]);	
+				$(target).append(message[index++]);
 				setTimeout(function () { showText(target, message, index, interval); }, interval)}
 		}
 		$(function () {
+			document.getElementById("OUT-TEXT").innerHTML = ""
 			showText("#OUT-TEXT", GET_TEXT, 0, 50)
 			setTimeout(getSpeech, 400)
 		})
@@ -135,11 +137,11 @@
 	setTimeout(Output, 350)
 	
 	function SetText() {
-		let showText = function (target, message, index, interval) 
-		{	
+		let showText = function (target, message, index, interval)
+		{
 			if (index < message.length) {
 				$(target).append(message[index++]);
-				setTimeout(function () { 
+				setTimeout(function () {
 					showText(target, message, index, interval); }, interval/(message.length/25))
 			}
 		}
@@ -161,12 +163,13 @@
 			listening = false
 			GET_TEXT = text
 			SetText()
-			$.Ajax({
+			$.ajax({
 				'type': 'POST',
 				'url': '/cmd',
 				'data': {'TEXT': text},
-				'success': function(suc){
-				
+				success: function(suc){
+					GET_TEXT = suc
+					Output()
 				}
 			})
 			
@@ -176,7 +179,7 @@
 			return text
 		}
 		recognition.onstart = function() {
-			listening = true; 	
+			listening = true;
 			console.log("REC Started!")
 			mic_img.src = on_img
 		}
@@ -205,5 +208,4 @@
 	
 	
 </script>
-	</body>
 </html>
