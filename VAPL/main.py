@@ -203,6 +203,8 @@ class Code:
 				TEXT = PATH.split(';>')[0]
 				try: CODE = PATH.split(';>')[1]
 				except: CODE = ""
+				if TEXT.find('(') == -1: TEXT += '('
+				if TEXT.find('(') == -1: TEXT += ')'
 				START = TEXT.find('(') + 1
 				END = TEXT.find(')', START)
 				PARAM = TEXT[START:END]
