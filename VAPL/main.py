@@ -4,7 +4,7 @@ from re import sub, escape
 from difflib import SequenceMatcher
 import sys
 
-
+Version = '0.0.103'
 # LIST OF ERRORS
 ################
 # Ill-v >> IllegalVariableName 	:> Char that python doesn't support when declaring VARIABLE
