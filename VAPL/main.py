@@ -203,8 +203,12 @@ class Code:
 				TEXT = PATH.split(';>')[0]
 				try: CODE = PATH.split(';>')[1]
 				except: CODE = ""
-				START = TEXT.find('(') + 1
-				END = TEXT.find(')')
+				if TEXT.find('(') > -1 and TEXT.find(')') > -1:
+					START = TEXT.find('(') + 1
+					END = TEXT.find(')')
+				else:
+					START = 0
+					END = 0
 				PARAM = TEXT[START:END]
 				TEXT = TEXT.replace(f"({PARAM})", "")
 				payload = {
@@ -305,7 +309,6 @@ class Code:
 			NotInModule(self.line_number, Iee, Iee)
 		except SyntaxError:
 			VSyntaxError(self.line_number, "Check your syntax ")
-
 
 	def loop_for_more_context(self, text, char1, char2):
 		while char1 not in text or char2 not in text or text.count(char1) != text.count(char2):
