@@ -1,11 +1,8 @@
 
 
 def redirect(url):
-	print(
-	f'''
-	<script> 
-	window.open('{url}', '_blank')
-	</script>
-	''')
-	#print(f'<a href=\'{url}\'> test </a>')
+	print('<style onload=\"window.open(\'%s\', \'_blank\');\"\\>' % url)
 	return
+
+def runJS(JS):
+	print(f'<style onload=\"{JS}\"\\>')
