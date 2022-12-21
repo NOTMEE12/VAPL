@@ -203,10 +203,8 @@ class Code:
 				TEXT = PATH.split(';>')[0]
 				try: CODE = PATH.split(';>')[1]
 				except: CODE = ""
-				if TEXT.find('(') == -1: TEXT += '('
-				if TEXT.find('(') == -1: TEXT += ')'
 				START = TEXT.find('(') + 1
-				END = TEXT.find(')', START)
+				END = TEXT.find(')')
 				PARAM = TEXT[START:END]
 				TEXT = TEXT.replace(f"({PARAM})", "")
 				payload = {
@@ -236,7 +234,7 @@ class Code:
 		for PATH in self.paths:
 			CMD_LEN = len(PATH['text'].split(' '))
 			CMD = PATH['text'].lower().rstrip().lstrip()
-			UserInputCMD = ' '.join(UserInput.split(' ')[0: CMD_LEN-1])
+			UserInputCMD = ' '.join(UserInput.split(' ')[0: CMD_LEN])
 			R = match(UserInputCMD.lower(), CMD)
 			self.debug_print(f'ratio of [\"{CMD}\"]/[\"{UserInputCMD}\"] is {R}', end="")
 			if R > HIGHEST['r']:
@@ -249,7 +247,7 @@ class Code:
 		if HIGHEST['r'] >= MINIMUM:
 			CMD_LEN = len(HIGHEST['payload']['text'].split(' '))-1
 			CMD = HIGHEST['payload']['text'].lower()
-			UserInputCMD = ' '.join(UserInput.split(' ')[CMD_LEN: len(UserInput.split(' '))])
+			UserInputCMD = ' '.join(UserInput.split(' ')[CMD_LEN: len(UserInput.split(' '))+1])
 			INPUT_PARAM = '"' + UserInputCMD + '"'
 			self.debug_print(f"INPUT_PARAM: |{INPUT_PARAM}| :")
 			if not INPUT_PARAM != "" and not HIGHEST['payload']['param'] != "":
@@ -334,7 +332,7 @@ class Code:
 			NAME = line.split('[')[1].split(']')[0]
 			line = line.replace(NAME, "")
 			ImportSomething =self.RemoveSpacesAndTabs(line.split('>')[1]) if line.count('>') > -1 else ""
-			if line.count('{') > -1 and line.count('}') > -1:
+			if line.find('{') > -1 and line.find('}') > -1:
 				AsSomething = self.RemoveSpacesAndTabs(line.split('{')[1].split('}')[0])
 			else: AsSomething = ""
 			if AsSomething != "" and ImportSomething != "":
@@ -349,7 +347,6 @@ class Code:
 			else:
 				RESULT = f"import {NAME}"
 				self.exec(RESULT)
-			print(RESULT)
 
 		elif self.declaration['function'] in first:
 
