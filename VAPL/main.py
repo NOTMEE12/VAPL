@@ -3,7 +3,7 @@ from io import StringIO
 from re import sub, escape
 from difflib import SequenceMatcher
 import sys
-from os.path import abspath
+from os.path import abspath, dirname
 
 Version = '0.0.114'
 # LIST OF ERRORS
@@ -23,6 +23,8 @@ Version = '0.0.114'
 # Mis-c >> MissingChar				:> when char is missing
 # Mis-m >> MissingModule			:> Module is not found
 # Mdc-M >> ModuleDoesntContainsThat :> User tries to import something that package does not provide
+# Mis-p >> MissingParameter			:> parameter not given to function from modules
+# 										(since in VAPL interpreter doesn't care)
 
 
 class BasicError:
@@ -91,11 +93,16 @@ class MissingChar(BasicError):
 	def __init__(self, num, char): super().__init__(num, f"Missing char {char}", "Mis-c")
 
 
+class MissingParameter(BasicError):
+	def __init__(self, num, func, param):
+		super().__init__(num, f"""Function {func} requires {param.replace("'", '')}""", "Mis-P")
+
+
 class MissingModule(BasicError):
 	def __init__(self, num, moduleName): super().__init__(num, f"Module not found {moduleName}", "Mis-m")
 
 
-class ModuleDoesntConstainsThat(BasicError):
+class ModuleDoesntContainThat(BasicError):
 	def __init__(self, num, n, moduleName): super().__init__(num, f"Cannot not find \'{n}\' in {moduleName}", "Mdc-t")
 
 
@@ -110,7 +117,8 @@ class Code:
 		'paths',
 		'rawCode',
 		'exit',
-		'debug'
+		'debug',
+		'BuiltIns'
 	]
 
 	def __init__(self, SCRIPT_OR_PATH, IS_PATH: bool or int = False, debug=False):
@@ -146,12 +154,14 @@ class Code:
 	def setup_new_code(self, SCRIPT_OR_PATH, IS_PATH: bool or int = False, debug=False):
 		"""setups new code that can be run using run method."""
 		def setup():
-			self.locals = {}
-			self.globals = {}
 			self.paths = []
 			self.modules = []
 			self.line_number = 0
 			self.debug = debug
+			self.BuiltIns = {
+				'name': 'VAPL',
+				'ignore': None,
+			}
 
 			def execute(src):
 				self.QuickSetupAndRun(src, AllowGracefulExit=False)
@@ -170,7 +180,7 @@ class Code:
 			self.rawCode = self.code
 			setup()
 
-	def QuickSetupAndRun(self, Code, IS_FILEPATH=False, AllowGracefulExit=True):
+	def QuickSetupAndRun(self, code, IS_FILEPATH=False, AllowGracefulExit=True):
 		"""
 		Setups new code, runs it and changes it back to old. \n
 		Difference is that it saves and runs new code WITH old globals and locals variables, functions, paths,  etc.
@@ -180,7 +190,7 @@ class Code:
 		lineNumber = self.line_number
 		Globals, Locals = self.globals, self.locals
 		paths = self.paths
-		self.setup_new_code(Code, IS_FILEPATH)
+		self.setup_new_code(code, IS_FILEPATH)
 		self.globals, self.locals = Globals, Locals
 		self.run(AllowGracefulExit)
 		self.setup_new_code(OldCode)
@@ -188,7 +198,7 @@ class Code:
 		self.globals, self.locals = Globals, Locals
 		self.paths = paths
 
-	def configure_PATHS(self):
+	def configure_paths(self):
 		"""
 		configures and saves PATHS to dict
 		"""
@@ -206,7 +216,7 @@ class Code:
 		# ALL PATHS ARE COMPLETED AND DELETED FROM MAIN CODE.
 		# NOW THEY WILL BE SAVED.
 		for PATH in PATHS.split('\n'):
-			PATH = self.RemoveSpacesAndTabs(PATH)
+			PATH = self.remove_spaces_and_tabs(PATH)
 			if PATH != "":
 				TEXT = PATH.split(';>')[0]
 				try:
@@ -224,7 +234,7 @@ class Code:
 				payload = {
 					'text':
 						eval(
-							str(self.RemoveSpacesAndTabs(TEXT)).rstrip().rstrip(
+							str(self.remove_spaces_and_tabs(TEXT)).rstrip().rstrip(
 								'\t').rstrip().rstrip('\t')),
 					'param':
 						PARAM,
@@ -282,7 +292,7 @@ class Code:
 				self.execute_line(HIGHEST['payload']['code'])
 				sys.stdout = old_stdout  # Put the old stream back in place
 				whatWasPrinted = buffer.getvalue()
-				print(whatWasPrinted)
+				print(whatWasPrinted.encode().decode())
 				return whatWasPrinted
 		else:
 			print("No commands found")
@@ -302,7 +312,7 @@ class Code:
 	def run(self, AllowGracefulError=True):
 		"""Runs code from setup"""
 		self.exclude_comments()
-		self.configure_PATHS()
+		self.configure_paths()
 		self.code = self.code.split('\n')
 		while self.line_number + 1 < len(self.code):
 			line = self.code[self.line_number]
@@ -317,17 +327,23 @@ class Code:
 		except NameError:
 			NameNotKnown(self.line_number)
 		except ModuleNotFoundError as err:
-			print(err)
 			MissingModule(self.line_number, err)
 		except ImportError as Iee:
 			print(Iee)
-			ModuleDoesntConstainsThat(self.line_number, Iee, Iee)
+			ModuleDoesntContainThat(self.line_number, Iee, Iee)
 		except SyntaxError:
-			VSyntaxError(self.line_number, "Check your syntax ")
+			VSyntaxError(self.line_number, "Check your syntax!")
+		except TypeError as Type:
+			if not str(Type).startswith("unsupported operand type(s) for"):
+				FUNC = str(Type).split(' ')[0]
+				PARAMS = str(Type).split(':')[1]
+				MissingParameter(self.line_number, FUNC, PARAMS)
+			else:
+				VTypeError(self.line_number)
 
 	def loop_for_more_context(self, text, char1, char2):
 		while char1 not in text or char2 not in text or text.count(char1) != text.count(char2):
-			text += '\n' + self.RemoveSpacesAndTabs(self.next_line())
+			text += '\n' + self.remove_spaces_and_tabs(self.next_line())
 		return text
 
 	def next_line(self):
@@ -339,19 +355,20 @@ class Code:
 
 	def execute_line(self, line: str):
 		"""Do not use! It is only necessary to use in method run!\n When used inappropriately it can return lots of bugs!"""
-		def CaptureMissingChars(char):
+		def capture_missing_chars(char):
 			if char not in line: MissingChar(self.line_number, char)
 
-		first = self.RemoveSpacesAndTabs(line).split(" ")[0]
-		line = self.RemoveSpacesAndTabs(line)
+		first = self.remove_spaces_and_tabs(line).split(" ")[0]
+		line = self.remove_spaces_and_tabs(line)
 		if self.declaration['module'] in first:
-			CaptureMissingChars('[')
-			CaptureMissingChars(']')
+			capture_missing_chars('[')
+			capture_missing_chars(']')
 			NAME = line.split('[')[1].split(']')[0]
 			line = line.replace(NAME, "")
-			ImportSomething =self.RemoveSpacesAndTabs(line.split('>')[1]) if line.count('>') > -1 else ""
+			if line.find('>') > -1: ImportSomething = self.remove_spaces_and_tabs(line.split('>')[1])
+			else: ImportSomething = ""
 			if line.find('{') > -1 and line.find('}') > -1:
-				AsSomething = self.RemoveSpacesAndTabs(line.split('{')[1].split('}')[0])
+				AsSomething = self.remove_spaces_and_tabs(line.split('{')[1].split('}')[0])
 			else: AsSomething = ""
 			if AsSomething != "" and ImportSomething != "":
 				RESULT = f"from {NAME} import {ImportSomething} as {AsSomething}"
@@ -376,7 +393,7 @@ class Code:
 			CODE = CODE.rstrip('}').lstrip('{')
 			CONVERT = ""
 			RECONVERT = ""
-			if self.RemoveSpacesAndTabs(PARAMS):
+			if self.remove_spaces_and_tabs(PARAMS):
 				for num, par in enumerate(PARAMS.split(',')):
 					CONVERT += f"{par} = PARS[{num}]\n"
 					RECONVERT += f"del {par}\n"
@@ -387,15 +404,31 @@ class Code:
 			self.exec(BASE_FUNCTION)
 
 		elif self.declaration['variable'] in first:
-			NAME = self.RemoveSpacesAndTabs(
-				self.RemoveSpacesAndTabs(line).lstrip(self.declaration['variable']).split("=")[0])
+			NAME = self.remove_spaces_and_tabs(
+				self.remove_spaces_and_tabs(line).lstrip(self.declaration['variable']).split("=")[0])
 			if line.find("=") != -1:
-				VALUE = self.RemoveSpacesAndTabs(line).split("=")[1]
-				if self.RemoveSpacesAndTabs(VALUE) == "":
+				VALUE = self.remove_spaces_and_tabs(line.split("=")[1])
+				if VALUE == "":
 					VALUE = None
+				if VALUE.lower() == self.BuiltIns:
+					VALUE = self.BuiltIns[VALUE]
 			else:
 				VALUE = None
 			self.exec(f"{NAME} = {VALUE}")
+
+		elif self.declaration['BuiltIn'] in first:
+			NAME = self.remove_spaces_and_tabs(line.split('=')[0].lstrip(self.declaration['BuiltIn']))
+			if NAME == "":
+				VSyntaxError(self.line_number, f'can\'t edit \'{self.declaration["BuiltIn"]}\'')
+			VALUE = self.eval(self.remove_spaces_and_tabs(line.split('=')[1]))
+			if VALUE == "":
+				VSyntaxError(self.line_number, f'tried to assign nothing to \'{self.declaration["BuiltIn"]}:{VALUE}\'')
+			for builtin in self.BuiltIns:
+				if NAME.lower() == builtin:
+					self.globals[f'{self.declaration["BuiltIn"]}:{NAME}'] = VALUE
+					break
+			else:
+				VSyntaxError(self.line_number, f'\'$\' doesn\'t have {NAME}')
 
 		elif self.declaration['if'] in first:
 			statement = line[line.find(self.declaration['if']) + len(self.declaration['if']):line.find(')') + 1]
@@ -409,7 +442,10 @@ class Code:
 
 		elif self.declaration['print'] in first:
 			PRINT = line.split(self.declaration['print'])[1].lstrip(':')
-			print("CODE  | ", self.eval(PRINT))
+			if self.remove_spaces_and_tabs(PRINT) in self.declaration['BuiltIn']:
+				print("BUIlT | ", self.remove_spaces_and_tabs(PRINT))
+			else:
+				print("CODE  | ", self.eval(PRINT))
 
 		elif self.declaration['exit'] in first:
 			GracefulExit(self.line_number)
@@ -417,18 +453,18 @@ class Code:
 		elif self.declaration['call'] in first:
 			# I COULD MAKE THAT SO WHEN "self.globals in first or self.locals in first: ..." instead of new CALL
 			# but with it this language is now special!
-			FUNCTION = self.RemoveSpacesAndTabs(line.split(self.declaration['call'])[1].lstrip(':'))
+			FUNCTION = self.remove_spaces_and_tabs(line.split(self.declaration['call'])[1].lstrip(':'))
 			self.exec(FUNCTION)
 
-		elif self.RemoveSpacesAndTabs(line) != "":
+		elif self.remove_spaces_and_tabs(line) != "":
 			VSyntaxError(self.line_number, line)
 
-	def getCommands(self):
+	def get_commands(self):
 		"""get all possible commands!"""
 		return self.paths
 
 	@staticmethod
-	def RemoveSpacesAndTabs(text: str):
+	def remove_spaces_and_tabs(text: str):
 		"""Removes spaces and tabs from the start of the string"""
 		return text.lstrip().lstrip('\t').lstrip().lstrip('\t')
 
@@ -444,13 +480,13 @@ class Web:
 		"""Flask object to run code, so you will just need to create code for assistant and save time."""
 		self.debug: bool = debug
 		if connect_to_server is False:
-			char = "\\"  # BECAUSE YOU CAN'T USE \ IN F-STRINGS
-			self.app = Flask(__name__,# __file__[0: __file__.rfind('\\')],
-							 root_path=__file__[0: __file__.rfind('\\')],
-							 template_folder="",
-							 static_folder="",
-							)
-			del char
+			print(dirname(__file__))
+			self.app = Flask(
+							abspath(__file__),
+							root_path=dirname(__file__),
+							template_folder="",
+							static_folder=""
+							 )
 			self.print_all()
 			self.code = code
 		else:
@@ -465,7 +501,6 @@ class Web:
 		self.debug_print("TEMPLATE FOLDER  >> " + self.app.template_folder)
 		self.debug_print("STATIC FOLDER    >> " + self.app.static_folder)
 		self.debug_print('========================================')
-
 
 	def debug_print(self, *text, sep=",", end="\n"):
 		if self.debug is True:
@@ -528,7 +563,7 @@ class Web:
 			print("Err: " + str(self.code.line_number), str(), sep="=:")
 		sys.stdout = old_stdout  # Put the old stream back in place
 		whatWasPrinted = buffer.getvalue()
-		PRE_COMMANDS = self.code.getCommands()
+		PRE_COMMANDS = self.code.get_commands()
 		COMMANDS = "<ul>"
 		for command in PRE_COMMANDS:
 			COMMANDS += '<li>' + command['text'] + '<a>' + command['param'] + '</a>' + '<br>'
