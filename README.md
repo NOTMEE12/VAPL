@@ -33,7 +33,7 @@ pip install -i https://test.pypi.org/simple/ VAPL
 ```python
 import VAPL
 
-Code = VAPL.Code('code.cbpl', True)
+Code = VAPL.Code('code.vapl', True)
 web = VAPL.Web(False)
 web.run('127.0.0.1', 81)
 ```
