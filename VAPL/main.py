@@ -3,24 +3,27 @@ from io import StringIO
 from re import sub, escape
 from difflib import SequenceMatcher
 import sys
+from os.path import abspath
 
-Version = '0.0.109'
+Version = '0.0.114'
 # LIST OF ERRORS
 ################
-# Ill-v >> IllegalVariableName 	:> Char that python doesn't support when declaring VARIABLE
-# Ill-f >> IllegalFunctionName 	:> Char that python doesn't support when declaring FUNCTION
+# Ill-v >> IllegalVariableName 		:> Char that python doesn't support when declaring VARIABLE
+# Ill-f >> IllegalFunctionName 		:> Char that python doesn't support when declaring FUNCTION
 ################
-# Eva-l >> EvaluationError 		:> Error during evaluation (operations (math. Btw. you should kno what is evaluation))
+# Eva-l >> EvaluationError 			:> Error during evaluation (operations (math. Btw. you should kno what is evaluation))
 ################
-# Typ-e >> TypeError			:> Adding two wrongs types of variable
-# Div-0 >> DivisionByZero		:> trying to divide number by zero
+# Typ-e >> TypeError				:> Adding two wrongs types of variable
+# Div-0 >> DivisionByZero			:> trying to divide number by zero
 ################
-# Exi-t >> GracefulExit			:> when interpreter ends interpreting or user calls `exit()`.
+# Exi-t >> GracefulExit				:> when interpreter ends interpreting or user calls `exit()`.
 ################
-# Nam-e >> NameNotKnown			:> user tries to call but name of variable, function, etc. is not known.
+# Nam-e >> NameNotKnown				:> user tries to call but name of variable, function, etc. is not known.
 ################
-# Mis-c >> MissingChar			:> when char is missing
-# Mis-m >> MissingModule		:> Module is not found
+# Mis-c >> MissingChar				:> when char is missing
+# Mis-m >> MissingModule			:> Module is not found
+# Mdc-M >> ModuleDoesntContainsThat :> User tries to import something that package does not provide
+
 
 class BasicError:
 	def __init__(self, line_number, BaseContext, STOPCODE, OptionalContext=None, name=None, prefix="Error"):
@@ -91,8 +94,10 @@ class MissingChar(BasicError):
 class MissingModule(BasicError):
 	def __init__(self, num, moduleName): super().__init__(num, f"Module not found {moduleName}", "Mis-m")
 
-class NotInModule(BasicError):
-	def __init__(self, num, n, moduleName): super().__init__(num, f"Cannot not find \'{n}\' in {moduleName}")
+
+class ModuleDoesntConstainsThat(BasicError):
+	def __init__(self, num, n, moduleName): super().__init__(num, f"Cannot not find \'{n}\' in {moduleName}", "Mdc-t")
+
 
 class Code:
 	__slots__ = [
@@ -187,22 +192,27 @@ class Code:
 		"""
 		configures and saves PATHS to dict
 		"""
-		if self.declaration['path-start'] not in self.code: self.code += self.declaration['path-start']
-		if self.declaration['path-end'] not in self.code: self.code += self.declaration['path-end']
+		if self.declaration['path-start'] not in self.code:
+			self.code += self.declaration['path-start']
+		if self.declaration['path-end'] not in self.code:
+			self.code += self.declaration['path-end']
 		self.paths = []
 		START = self.code.find(self.declaration['path-start'])
 		END = self.code.find(self.declaration['path-end'], START) + 2
 		PATHS = self.code[START:END]
 		self.code = self.code.replace(PATHS, "")
-		PATHS = PATHS.replace(self.declaration['path-start'], "").replace(self.declaration['path-end'], "")
+		PATHS = PATHS.replace(self.declaration['path-start'],
+							  "").replace(self.declaration['path-end'], "")
 		# ALL PATHS ARE COMPLETED AND DELETED FROM MAIN CODE.
 		# NOW THEY WILL BE SAVED.
 		for PATH in PATHS.split('\n'):
 			PATH = self.RemoveSpacesAndTabs(PATH)
 			if PATH != "":
 				TEXT = PATH.split(';>')[0]
-				try: CODE = PATH.split(';>')[1]
-				except: CODE = ""
+				try:
+					CODE = PATH.split(';>')[1]
+				except:
+					CODE = ""
 				if TEXT.find('(') > -1 and TEXT.find(')') > -1:
 					START = TEXT.find('(') + 1
 					END = TEXT.find(')')
@@ -212,9 +222,14 @@ class Code:
 				PARAM = TEXT[START:END]
 				TEXT = TEXT.replace(f"({PARAM})", "")
 				payload = {
-					'text': eval(str(self.RemoveSpacesAndTabs(TEXT)).rstrip().rstrip('\t').rstrip().rstrip('\t')),
-					'param': PARAM,
-					'code': CODE
+					'text':
+						eval(
+							str(self.RemoveSpacesAndTabs(TEXT)).rstrip().rstrip(
+								'\t').rstrip().rstrip('\t')),
+					'param':
+						PARAM,
+					'code':
+						CODE
 				}
 				self.paths.append(payload)
 
@@ -236,9 +251,9 @@ class Code:
 		MINIMUM = 90
 		self.debug_print("GETTING RESPONSE")
 		for PATH in self.paths:
-			CMD_LEN = len(PATH['text'].split(' '))
+			CMD_LEN = len(PATH['text'].rstrip().split(' '))
 			CMD = PATH['text'].lower().rstrip().lstrip()
-			UserInputCMD = ' '.join(UserInput.split(' ')[0: CMD_LEN])
+			UserInputCMD = ' '.join(UserInput.rstrip().split(' ')[0: CMD_LEN])
 			R = match(UserInputCMD.lower(), CMD)
 			self.debug_print(f'ratio of [\"{CMD}\"]/[\"{UserInputCMD}\"] is {R}', end="")
 			if R > HIGHEST['r']:
@@ -306,7 +321,7 @@ class Code:
 			MissingModule(self.line_number, err)
 		except ImportError as Iee:
 			print(Iee)
-			NotInModule(self.line_number, Iee, Iee)
+			ModuleDoesntConstainsThat(self.line_number, Iee, Iee)
 		except SyntaxError:
 			VSyntaxError(self.line_number, "Check your syntax ")
 
@@ -421,16 +436,40 @@ class Code:
 class Web:
 	__slots__ = [
 		'app',
-		'code'
+		'code',
+		'debug'
 	]
 
-	def __init__(self, connect_to_server: bool = False, code: Code = Code("")):
+	def __init__(self, connect_to_server: bool = False, code: Code = Code(""), debug: bool=False):
 		"""Flask object to run code, so you will just need to create code for assistant and save time."""
+		self.debug: bool = debug
 		if connect_to_server is False:
-			self.app = Flask(__name__)
+			char = "\\"  # BECAUSE YOU CAN'T USE \ IN F-STRINGS
+			self.app = Flask(__name__,# __file__[0: __file__.rfind('\\')],
+							 root_path=__file__[0: __file__.rfind('\\')],
+							 template_folder="",
+							 static_folder="",
+							)
+			del char
+			self.print_all()
 			self.code = code
 		else:
 			pass
+
+	def print_all(self):
+		self.debug_print('========================================')
+		self.debug_print("FLASK            >> " + self.app.instance_path[0: self.app.instance_path.rfind('\\')])
+		self.debug_print('========================================')
+		self.debug_print("FLASK NAME       >> " + self.app.name)
+		self.debug_print("ROOT PATH        >> " + self.app.root_path)
+		self.debug_print("TEMPLATE FOLDER  >> " + self.app.template_folder)
+		self.debug_print("STATIC FOLDER    >> " + self.app.static_folder)
+		self.debug_print('========================================')
+
+
+	def debug_print(self, *text, sep=",", end="\n"):
+		if self.debug is True:
+			print(sep.join(text), end=end)
 
 	def run_tutorial(self, host, port, debug: bool = False):
 		"""
@@ -469,7 +508,16 @@ class Web:
 
 		self.app.run(host=host, port=port, debug=debug)
 
-	def run(self, host, port, debug: bool = False, HTML_PAGE="Executer.html", ssl_certificate=None):
+	def run(self, host, port, debug: bool = False, HTML_PAGE=None, ssl_certificate=None):
+		if HTML_PAGE is None:
+			path = abspath(__file__)[len(self.app.root_path)+1:__file__.rfind('\\')]
+			HTML_PAGE = "Executer.html"
+			self.app.static_folder = "static"
+			self.app.template_folder = "templates"
+			del path
+		else:
+			self.app.root_path = self.app.instance_path[0: self.app.instance_path.rfind('\\')]
+		self.print_all()
 		code = str(self.code.rawCode)
 		old_stdout = sys.stdout  # Memorize the default stdout stream
 		sys.stdout = buffer = StringIO()
@@ -488,7 +536,9 @@ class Web:
 
 		@self.app.route('/', methods=['GET', 'POST'])
 		def execute():
-			return render_template(HTML_PAGE, output=whatWasPrinted, COMMANDS=str(COMMANDS))
+			try:
+				return render_template(HTML_PAGE, output=whatWasPrinted, COMMANDS=str(COMMANDS))
+			except Exception as Exc: return "Error " + str(Exc)
 
 		@self.app.route('/cmd', methods=['GET', 'POST'])
 		def cmd():
