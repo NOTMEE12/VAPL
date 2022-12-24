@@ -2,11 +2,11 @@ from flask import Flask, render_template, request, make_response
 from io import StringIO
 from re import sub, escape
 from difflib import SequenceMatcher
-import sys
 from os.path import abspath, dirname
 import ast
+from sys import stdout
 
-Version = '0.0.114'
+Version = '0.0.115'
 
 
 # LIST OF ERRORS
@@ -14,7 +14,8 @@ Version = '0.0.114'
 # Ill-v >> IllegalVariableName 		:> Char that python doesn't support when declaring VARIABLE
 # Ill-f >> IllegalFunctionName 		:> Char that python doesn't support when declaring FUNCTION
 ################
-# Eva-l >> EvaluationError 			:> Error during evaluation (operations (math. Btw. you should kno what is evaluation))
+# Eva-l >> EvaluationError 			:> Error during evaluation
+# 	                                               (operations (math. Btw. you should kno what is evaluation))
 ################
 # Typ-e >> TypeError				:> Adding two wrongs types of variable
 # Div-0 >> DivisionByZero			:> trying to divide number by zero
@@ -159,7 +160,8 @@ class Code:
 
 	def eval(self, expression):
 		try:
-			_expr = ast.parse(expression.replace(self.declaration['BuiltIn'], self.replacement['BuiltIn']),
+			_expr = ast.parse(self.remove_spaces_and_tabs(expression.replace(self.declaration['BuiltIn'],
+														  self.replacement['BuiltIn'])),
 							  '<expression>', mode='eval')
 			for node in ast.walk(_expr):
 				if isinstance(node, ast.Str):
@@ -171,8 +173,8 @@ class Code:
 		except TypeError as Type:
 			print(Type)
 			VTypeError(self.line_number)
-		except SyntaxError:
-			VSyntaxError(self.line_number, expression)
+		except SyntaxError as syntax:
+			VSyntaxError(self.line_number, str(syntax)+'::'+expression)
 		except NameError:
 			NameNotKnown(self.line_number)
 		except Exception as exc:
@@ -198,10 +200,11 @@ class Code:
 			self.locals = {}
 
 		if IS_PATH is True or IS_PATH == 1:
-			file = open(SCRIPT_OR_PATH, 'r')
+			file = open(SCRIPT_OR_PATH, 'r', encoding='utf-8')
 			self.code = file.read()
 			self.rawCode = self.code
 			file.close()
+			print(self.code)
 			setup()
 		else:
 			self.code = SCRIPT_OR_PATH
@@ -226,10 +229,8 @@ class Code:
 		self.globals, self.locals = Globals, Locals
 		self.paths = paths
 
-	def configure_paths(self):
-		"""
-		configures and saves PATHS to dict
-		"""
+	def exclude_paths(self):
+		""""""
 		if self.declaration['path-start'] not in self.code:
 			self.code += self.declaration['path-start']
 		if self.declaration['path-end'] not in self.code:
@@ -241,6 +242,14 @@ class Code:
 		self.code = self.code.replace(PATHS, "")
 		PATHS = PATHS.replace(self.declaration['path-start'],
 							  "").replace(self.declaration['path-end'], "")
+		self.paths = PATHS
+
+	def configure_paths(self):
+		"""
+		configures and saves PATHS to dict
+		"""
+		PATHS = self.paths
+		self.paths = []
 		# ALL PATHS ARE COMPLETED AND DELETED FROM MAIN CODE.
 		# NOW THEY WILL BE SAVED.
 		for PATH in PATHS.split('\n'):
@@ -282,6 +291,7 @@ class Code:
 		(if none were configured then it would return "COMMANDS NOT FOUND")\n
 		:return: str
 		"""
+		global stdout
 
 		def match(text1, text2):
 			return int(SequenceMatcher(None, text1, text2).ratio() * 100)
@@ -316,12 +326,12 @@ class Code:
 				return "Parameters not given. Try again later with parameters!"
 			else:
 				INPUT_PARAM = self.eval(INPUT_PARAM)
-				old_stdout = sys.stdout  # Memorize the default stdout stream
-				sys.stdout = buffer = StringIO()
+				old_stdout = stdout  # Memorize the default stdout stream
+				stdout = buffer = StringIO()
 				self.locals[HIGHEST['payload']['param']] = INPUT_PARAM
 				print("Executing command " + HIGHEST['payload']['text'])
 				self.execute_line(HIGHEST['payload']['code'])
-				sys.stdout = old_stdout  # Put the old stream back in place
+				stdout = old_stdout  # Put the old stream back in place
 				whatWasPrinted = buffer.getvalue()
 				print(whatWasPrinted.encode().decode())
 				return whatWasPrinted
@@ -341,9 +351,9 @@ class Code:
 		self.code = output
 
 	def run(self, AllowGracefulError=True):
-		"""Runs code from setup"""
+		"""Runs code from setup (configures paths, deletes comments, etc.)"""
 		self.exclude_comments()
-		self.configure_paths()
+		self.exclude_paths()
 		self.code = self.code.split('\n')
 		while self.line_number + 1 < len(self.code):
 			line = self.code[self.line_number]
@@ -352,13 +362,15 @@ class Code:
 		if self.line_number + 1 == len(self.code) and AllowGracefulError:
 			GracefulExit(self.line_number + 2)
 
+		self.configure_paths()
+
 	def exec(self, code):
 		try:
 			code = ast.parse(code, '<string>', mode='exec')
 			for node in ast.walk(code):
 				if isinstance(node, ast.Str):
 					node.s = node.s.replace(self.replacement['BuiltIn'], self.declaration['BuiltIn'])
-			code = compile(code, '<string>', 'eval')
+			code = compile(code, '<string>', 'exec')
 			exec(code, self.globals, self.locals)
 		except NameError:
 			NameNotKnown(self.line_number)
@@ -391,7 +403,9 @@ class Code:
 		return '\n' + line
 
 	def execute_line(self, line: str):
-		"""Do not use! It is only necessary to use in method run!\n When used inappropriately it can return lots of bugs!"""
+		"""
+		Do not use! It is only necessary to use in method run!\n When used inappropriately it can return lots of bugs!
+		"""
 
 		def capture_missing_chars(char):
 			if char not in line: MissingChar(self.line_number, char)
@@ -453,10 +467,8 @@ class Code:
 					VALUE = None
 			else:
 				VALUE = None
-			print(NAME, ' = ', VALUE)
-			self.globals[NAME] = VALUE
-			print(self.globals[NAME])
-			# self.exec(f"{NAME} = {VALUE}")
+			# self.globals[NAME] = VALUE
+			self.exec(f"{NAME} = {VALUE}")
 
 		elif self.declaration['BuiltIn'] in first:
 			NAME = self.remove_spaces_and_tabs(line.split('=')[0].lstrip(self.declaration['BuiltIn']))
@@ -505,7 +517,9 @@ class Code:
 	@staticmethod
 	def remove_spaces_and_tabs(text: str):
 		"""Removes spaces and tabs from the start of the string"""
-		return text.lstrip().lstrip('\t').lstrip().lstrip('\t')
+		text = text.lstrip().lstrip('\t').lstrip().lstrip('\t')
+		text = text.rstrip().rstrip('\t').rstrip().rstrip('\t')
+		return text
 
 
 class Web:
@@ -561,16 +575,17 @@ class Web:
 
 		@self.app.route('/code', methods=['get', 'post'])
 		def run():
+			global stdout
 			code = str(request.form['code'])
 			print(code)
-			old_stdout = sys.stdout  # Memorize the default stdout stream
-			sys.stdout = buffer = StringIO()
+			old_stdout = stdout  # Memorize the default stdout stream
+			stdout = buffer = StringIO()
 			try:
 				self.code.setup_new_code(code)
 				self.code.run()
 			except:
 				print("Err: " + str(self.code.line_number), str(), sep="=:")
-			sys.stdout = old_stdout  # Put the old stream back in place
+			stdout = old_stdout  # Put the old stream back in place
 			whatWasPrinted = buffer.getvalue()
 			print(whatWasPrinted)
 			return whatWasPrinted
@@ -583,6 +598,7 @@ class Web:
 		self.app.run(host=host, port=port, debug=debug)
 
 	def run(self, host, port, debug: bool = False, HTML_PAGE=None, ssl_certificate=None):
+		global stdout
 		if HTML_PAGE is None:
 			path = abspath(__file__)[len(self.app.root_path) + 1:__file__.rfind('\\')]
 			HTML_PAGE = "Executer.html"
@@ -593,14 +609,14 @@ class Web:
 			self.app.root_path = self.app.instance_path[0: self.app.instance_path.rfind('\\')]
 		self.print_all()
 		code = str(self.code.rawCode)
-		old_stdout = sys.stdout  # Memorize the default stdout stream
-		sys.stdout = buffer = StringIO()
+		old_stdout = stdout  # Memorize the default stdout stream
+		stdout = buffer = StringIO()
 		try:
 			self.code.setup_new_code(code)
 			self.code.run()
 		except:
 			print("Err: " + str(self.code.line_number), str(), sep="=:")
-		sys.stdout = old_stdout  # Put the old stream back in place
+		stdout = old_stdout  # Put the old stream back in place
 		whatWasPrinted = buffer.getvalue()
 		PRE_COMMANDS = self.code.get_commands()
 		COMMANDS = "<ul>"
