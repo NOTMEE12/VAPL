@@ -4,8 +4,11 @@ from re import sub, escape
 from difflib import SequenceMatcher
 import sys
 from os.path import abspath, dirname
+import ast
 
 Version = '0.0.114'
+
+
 # LIST OF ERRORS
 ################
 # Ill-v >> IllegalVariableName 		:> Char that python doesn't support when declaring VARIABLE
@@ -24,10 +27,12 @@ Version = '0.0.114'
 # Mis-m >> MissingModule			:> Module is not found
 # Mdc-M >> ModuleDoesntContainsThat :> User tries to import something that package does not provide
 # Mis-p >> MissingParameter			:> parameter not given to function from modules
-# 										(since in VAPL interpreter doesn't care)
+#   									(since in VAPL interpreter doesn't care)
 
 
 class BasicError:
+	notes = []
+
 	def __init__(self, line_number, BaseContext, STOPCODE, OptionalContext=None, name=None, prefix="Error"):
 		self.prefix = prefix[0:5]
 		if OptionalContext is not None:
@@ -40,6 +45,12 @@ class BasicError:
 		self.print_length()
 		print(self)
 		self.print_length()
+		self.notes = []
+
+	def AddNote(self, note: str):
+		self.notes.append(f'NOTES | ' + ' ' * len(note))
+		self.notes.append(note)
+		self.notes.append(f'NOTES | ' + ' ' * len(note))
 
 	def print_length(self):
 		LEN1 = len(self.__repr__().split('\n')[0])
@@ -50,7 +61,8 @@ class BasicError:
 			print(f"{self.prefix} | " + '-' * (LEN2 - 8))
 
 	def __repr__(self):
-		return f"{' '*8}{self.stop} | On line {self.num} happened: \n{' '*8}{self.stop} | {self.name} >> {self.cont}"
+		return f"{' ' * 8}{self.stop} | On line {self.num} happened: \n{' ' * 8}{self.stop} | {self.name} >> {self.cont}" + \
+			   f'\n'.join(self.notes)
 
 
 class IllegalVariableName(BasicError):
@@ -64,7 +76,7 @@ class IllegalFunctionName(BasicError):
 class EvaluationError(BasicError):
 	def __init__(self, num, context=None):
 		super().__init__(num,
-						 "error during evaluation" if context is not None else f"error during evalution >{context}<",
+						 "error during evaluation" if context is None else f"error during evalution > [{context}]",
 						 "Eva-l")
 
 
@@ -118,7 +130,8 @@ class Code:
 		'rawCode',
 		'exit',
 		'debug',
-		'BuiltIns'
+		'BuiltIns',
+		'replacement'
 	]
 
 	def __init__(self, SCRIPT_OR_PATH, IS_PATH: bool or int = False, debug=False):
@@ -140,19 +153,34 @@ class Code:
 			'path-start': '/*',
 			'path-end': '*/'
 		}
+		self.replacement = {
+			'BuiltIn': 'BuiltIn__'
+		}
 
 	def eval(self, expression):
 		try:
+			_expr = ast.parse(expression.replace(self.declaration['BuiltIn'], self.replacement['BuiltIn']),
+							  '<expression>', mode='eval')
+			for node in ast.walk(_expr):
+				if isinstance(node, ast.Str):
+					node.s = node.s.replace(self.replacement['BuiltIn'], self.declaration['BuiltIn'])
+			COMPILE = compile(_expr, '<expression>', 'eval')
 			return eval(expression, self.globals, self.locals)
 		except ZeroDivisionError:
 			DivisionByZero(self.line_number)
-		except TypeError:
+		except TypeError as Type:
+			print(Type)
 			VTypeError(self.line_number)
-		except Exception as err:
-			EvaluationError(self.line_number, expression)
+		except SyntaxError:
+			VSyntaxError(self.line_number, expression)
+		except NameError:
+			NameNotKnown(self.line_number)
+		except Exception as exc:
+			EvaluationError(self.line_number, str(exc) + '::'+expression)
 
 	def setup_new_code(self, SCRIPT_OR_PATH, IS_PATH: bool or int = False, debug=False):
 		"""setups new code that can be run using run method."""
+
 		def setup():
 			self.paths = []
 			self.modules = []
@@ -233,7 +261,7 @@ class Code:
 				TEXT = TEXT.replace(f"({PARAM})", "")
 				payload = {
 					'text':
-						eval(
+						self.eval(
 							str(self.remove_spaces_and_tabs(TEXT)).rstrip().rstrip(
 								'\t').rstrip().rstrip('\t')),
 					'param':
@@ -254,13 +282,18 @@ class Code:
 		(if none were configured then it would return "COMMANDS NOT FOUND")\n
 		:return: str
 		"""
+
 		def match(text1, text2):
 			return int(SequenceMatcher(None, text1, text2).ratio() * 100)
+
 		UserInput = UserInput
 		HIGHEST = {'payload': None, 'r': 0}
 		MINIMUM = 90
 		self.debug_print("GETTING RESPONSE")
+		self.debug_print(end="")
+		self.debug_print(self.paths, sep="\n", end="")
 		for PATH in self.paths:
+			print(PATH['text'])
 			CMD_LEN = len(PATH['text'].rstrip().split(' '))
 			CMD = PATH['text'].lower().rstrip().lstrip()
 			UserInputCMD = ' '.join(UserInput.rstrip().split(' ')[0: CMD_LEN])
@@ -271,12 +304,10 @@ class Code:
 				HIGHEST['r'] = R
 		self.debug_print()
 		self.debug_print(HIGHEST, sep="\n", end="")
-		self.debug_print(end="")
-		self.debug_print(self.paths, sep="\n", end="")
 		if HIGHEST['r'] >= MINIMUM:
-			CMD_LEN = len(HIGHEST['payload']['text'].split(' '))-1
+			CMD_LEN = len(HIGHEST['payload']['text'].split(' ')) - 1
 			CMD = HIGHEST['payload']['text'].lower()
-			UserInputCMD = ' '.join(UserInput.split(' ')[CMD_LEN: len(UserInput.split(' '))+1])
+			UserInputCMD = ' '.join(UserInput.split(' ')[CMD_LEN: len(UserInput.split(' ')) + 1])
 			INPUT_PARAM = '"' + UserInputCMD + '"'
 			self.debug_print(f"INPUT_PARAM: |{INPUT_PARAM}| :")
 			if not INPUT_PARAM != "" and not HIGHEST['payload']['param'] != "":
@@ -323,6 +354,11 @@ class Code:
 
 	def exec(self, code):
 		try:
+			code = ast.parse(code, '<string>', mode='exec')
+			for node in ast.walk(code):
+				if isinstance(node, ast.Str):
+					node.s = node.s.replace(self.replacement['BuiltIn'], self.declaration['BuiltIn'])
+			code = compile(code, '<string>', 'eval')
 			exec(code, self.globals, self.locals)
 		except NameError:
 			NameNotKnown(self.line_number)
@@ -332,11 +368,12 @@ class Code:
 			print(Iee)
 			ModuleDoesntContainThat(self.line_number, Iee, Iee)
 		except SyntaxError:
-			VSyntaxError(self.line_number, "Check your syntax!")
+			VSyntaxError(self.line_number, 'Check your syntax!')
 		except TypeError as Type:
+			print(Type)
 			if not str(Type).startswith("unsupported operand type(s) for"):
 				FUNC = str(Type).split(' ')[0]
-				PARAMS = str(Type).split(':')[1]
+				PARAMS = ''#str(Type).split(':')[1]
 				MissingParameter(self.line_number, FUNC, PARAMS)
 			else:
 				VTypeError(self.line_number)
@@ -355,6 +392,7 @@ class Code:
 
 	def execute_line(self, line: str):
 		"""Do not use! It is only necessary to use in method run!\n When used inappropriately it can return lots of bugs!"""
+
 		def capture_missing_chars(char):
 			if char not in line: MissingChar(self.line_number, char)
 
@@ -365,11 +403,14 @@ class Code:
 			capture_missing_chars(']')
 			NAME = line.split('[')[1].split(']')[0]
 			line = line.replace(NAME, "")
-			if line.find('>') > -1: ImportSomething = self.remove_spaces_and_tabs(line.split('>')[1])
-			else: ImportSomething = ""
+			if line.find('>') > -1:
+				ImportSomething = self.remove_spaces_and_tabs(line.split('>')[1])
+			else:
+				ImportSomething = ""
 			if line.find('{') > -1 and line.find('}') > -1:
 				AsSomething = self.remove_spaces_and_tabs(line.split('{')[1].split('}')[0])
-			else: AsSomething = ""
+			else:
+				AsSomething = ""
 			if AsSomething != "" and ImportSomething != "":
 				RESULT = f"from {NAME} import {ImportSomething} as {AsSomething}"
 				self.exec(RESULT)
@@ -397,7 +438,7 @@ class Code:
 				for num, par in enumerate(PARAMS.split(',')):
 					CONVERT += f"{par} = PARS[{num}]\n"
 					RECONVERT += f"del {par}\n"
-			CONVERT, RECONVERT = "", ""
+			# CONVERT, RECONVERT = "", ""
 			BASE_FUNCTION = \
 				f"""def {NAME} (*PARS):\n{CONVERT}\n  execute('''{CODE}''')\n{RECONVERT}	
 			"""
@@ -410,11 +451,12 @@ class Code:
 				VALUE = self.remove_spaces_and_tabs(line.split("=")[1])
 				if VALUE == "":
 					VALUE = None
-				if VALUE.lower() == self.BuiltIns:
-					VALUE = self.BuiltIns[VALUE]
 			else:
 				VALUE = None
-			self.exec(f"{NAME} = {VALUE}")
+			print(NAME, ' = ', VALUE)
+			self.globals[NAME] = VALUE
+			print(self.globals[NAME])
+			# self.exec(f"{NAME} = {VALUE}")
 
 		elif self.declaration['BuiltIn'] in first:
 			NAME = self.remove_spaces_and_tabs(line.split('=')[0].lstrip(self.declaration['BuiltIn']))
@@ -442,10 +484,7 @@ class Code:
 
 		elif self.declaration['print'] in first:
 			PRINT = line.split(self.declaration['print'])[1].lstrip(':')
-			if self.remove_spaces_and_tabs(PRINT) in self.declaration['BuiltIn']:
-				print("BUIlT | ", self.remove_spaces_and_tabs(PRINT))
-			else:
-				print("CODE  | ", self.eval(PRINT))
+			print("CODE  | ", self.eval(PRINT))
 
 		elif self.declaration['exit'] in first:
 			GracefulExit(self.line_number)
@@ -476,17 +515,17 @@ class Web:
 		'debug'
 	]
 
-	def __init__(self, connect_to_server: bool = False, code: Code = Code(""), debug: bool=False):
+	def __init__(self, connect_to_server: bool = False, code: Code = Code(""), debug: bool = False):
 		"""Flask object to run code, so you will just need to create code for assistant and save time."""
 		self.debug: bool = debug
 		if connect_to_server is False:
 			print(dirname(__file__))
 			self.app = Flask(
-							abspath(__file__),
-							root_path=dirname(__file__),
-							template_folder="",
-							static_folder=""
-							 )
+				abspath(__file__),
+				root_path=dirname(__file__),
+				template_folder="",
+				static_folder=""
+			)
 			self.print_all()
 			self.code = code
 		else:
@@ -545,7 +584,7 @@ class Web:
 
 	def run(self, host, port, debug: bool = False, HTML_PAGE=None, ssl_certificate=None):
 		if HTML_PAGE is None:
-			path = abspath(__file__)[len(self.app.root_path)+1:__file__.rfind('\\')]
+			path = abspath(__file__)[len(self.app.root_path) + 1:__file__.rfind('\\')]
 			HTML_PAGE = "Executer.html"
 			self.app.static_folder = "static"
 			self.app.template_folder = "templates"
@@ -566,14 +605,15 @@ class Web:
 		PRE_COMMANDS = self.code.get_commands()
 		COMMANDS = "<ul>"
 		for command in PRE_COMMANDS:
-			COMMANDS += '<li>' + command['text'] + '<a>' + command['param'] + '</a>' + '<br>'
+			COMMANDS += '<li>' + str(command['text']) + '<a>' + command['param'] + '</a>' + '<br>'
 		COMMANDS += "</ul>"
 
 		@self.app.route('/', methods=['GET', 'POST'])
 		def execute():
 			try:
 				return render_template(HTML_PAGE, output=whatWasPrinted, COMMANDS=str(COMMANDS))
-			except Exception as Exc: return "Error " + str(Exc)
+			except Exception as Exc:
+				return "Error " + str(Exc)
 
 		@self.app.route('/cmd', methods=['GET', 'POST'])
 		def cmd():
