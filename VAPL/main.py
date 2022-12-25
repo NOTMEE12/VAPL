@@ -5,7 +5,9 @@ from difflib import SequenceMatcher
 from os.path import abspath, dirname
 import ast
 from sys import stdout
-
+import datetime
+from base64 import b64encode, b64decode
+from termcolor import cprint
 Version = '0.0.115'
 
 
@@ -34,36 +36,48 @@ Version = '0.0.115'
 class BasicError:
 	notes = []
 
-	def __init__(self, line_number, BaseContext, STOPCODE, OptionalContext=None, name=None, prefix="Error"):
-		self.prefix = prefix[0:5]
+	def __init__(self, line_number, BaseContext, STOPCODE, OptionalContext=None, name=None, prefix="Error",
+				 exits: bool=True):
+		self.prefix = str(prefix + ''*6)[0:5]
 		if OptionalContext is not None:
 			context = OptionalContext
 		else:
 			context = BaseContext
 		if name is None:
 			name = type(self).__name__
-		self.num, self.name, self.cont, self.stop = line_number, name, context, STOPCODE
+		self.num, self.cont, self.name, self.exits = line_number, context, name, exits
+		self.stop = str(STOPCODE+' '*6)[0:5]
+
+	def add_note(self, note: str):
+		self.notes.append(f'NOTES | ' + ' ' * len(note))
+		self.notes.append(' '*8+note)
+		self.notes.append(f'NOTES | ' + ' ' * len(note))
+		return self
+
+	def throw(self):
 		self.print_length()
-		print(self)
+		cprint(str(self), 'red')
 		self.print_length()
 		self.notes = []
-
-	def AddNote(self, note: str):
-		self.notes.append(f'NOTES | ' + ' ' * len(note))
-		self.notes.append(note)
-		self.notes.append(f'NOTES | ' + ' ' * len(note))
+		if self.exits: exit()
 
 	def print_length(self):
-		LEN1 = len(self.__repr__().split('\n')[0])
-		LEN2 = len(self.__repr__().split('\n')[1])
+		LEN1 = len(str(self).split('\n')[0])
+		LEN2 = len(str(self).split('\n')[1])
 		if LEN1 > LEN2:
-			print(f"{self.prefix} | " + '-' * (LEN1 - 8))
+			cprint(f"{self.prefix} | " + '-' * (LEN1 - 8), 'magenta')
 		else:
-			print(f"{self.prefix} | " + '-' * (LEN2 - 8))
+			cprint(f"{self.prefix} | " + '-' * (LEN2 - 8), 'magenta')
 
 	def __repr__(self):
-		return f"{' ' * 8}{self.stop} | On line {self.num} happened: \n{' ' * 8}{self.stop} | {self.name} >> {self.cont}" + \
-			   f'\n'.join(self.notes)
+		self.print_length()
+		cprint(str(self), 'red')
+		self.print_length()
+
+	def __str__(self):
+		return f"{' ' * 8}{self.stop} | On line {self.num} happened: \n{' ' * 8}{self.stop} | " \
+			   f"{self.name} >> {self.cont}" \
+			   f'\n{" "*8}' + f'\n{" "*8}'.join(self.notes)
 
 
 class IllegalVariableName(BasicError):
@@ -95,7 +109,7 @@ class VSyntaxError(BasicError):
 
 
 class GracefulExit(BasicError):
-	def __init__(self, num): super().__init__(num, "Exited gracefully", "Exi-t", prefix="GEXIT")
+	def __init__(self, num): super().__init__(num, "Exited gracefully", "Exi-t", prefix="GEXIT", exits=False)
 
 
 class NameNotKnown(BasicError):
@@ -154,9 +168,6 @@ class Code:
 			'path-start': '/*',
 			'path-end': '*/'
 		}
-		self.replacement = {
-			'BuiltIn': 'BuiltIn__'
-		}
 
 	def eval(self, expression):
 		try:
@@ -171,8 +182,7 @@ class Code:
 		except ZeroDivisionError:
 			DivisionByZero(self.line_number)
 		except TypeError as Type:
-			print(Type)
-			VTypeError(self.line_number)
+			VTypeError(self.line_number).add_note(str(Type))
 		except SyntaxError as syntax:
 			VSyntaxError(self.line_number, str(syntax)+'::'+expression)
 		except NameError:
@@ -188,6 +198,7 @@ class Code:
 			self.modules = []
 			self.line_number = 0
 			self.debug = debug
+			self.replacement = {'BuiltIn': 'BuiltIn__'}
 			self.BuiltIns = {
 				'name': 'VAPL',
 				'ignore': None,
@@ -197,6 +208,8 @@ class Code:
 				self.QuickSetupAndRun(src, AllowGracefulExit=False)
 
 			self.globals = {'execute': execute, 'eval': self.eval}
+			for BI in self.BuiltIns:
+				self.globals[str(self.replacement['BuiltIn']) + BI] = self.BuiltIns[BI]
 			self.locals = {}
 
 		if IS_PATH is True or IS_PATH == 1:
@@ -204,7 +217,6 @@ class Code:
 			self.code = file.read()
 			self.rawCode = self.code
 			file.close()
-			print(self.code)
 			setup()
 		else:
 			self.code = SCRIPT_OR_PATH
@@ -248,7 +260,7 @@ class Code:
 		"""
 		configures and saves PATHS to dict
 		"""
-		PATHS = self.paths
+		PATHS: str = str(self.paths)
 		self.paths = []
 		# ALL PATHS ARE COMPLETED AND DELETED FROM MAIN CODE.
 		# NOW THEY WILL BE SAVED.
@@ -333,7 +345,6 @@ class Code:
 				self.execute_line(HIGHEST['payload']['code'])
 				stdout = old_stdout  # Put the old stream back in place
 				whatWasPrinted = buffer.getvalue()
-				print(whatWasPrinted.encode().decode())
 				return whatWasPrinted
 		else:
 			print("No commands found")
@@ -473,16 +484,18 @@ class Code:
 		elif self.declaration['BuiltIn'] in first:
 			NAME = self.remove_spaces_and_tabs(line.split('=')[0].lstrip(self.declaration['BuiltIn']))
 			if NAME == "":
-				VSyntaxError(self.line_number, f'can\'t edit \'{self.declaration["BuiltIn"]}\'')
+				VSyntaxError(self.line_number, f'can\'t edit \'{self.declaration["BuiltIn"]}\'').throw()
 			VALUE = self.eval(self.remove_spaces_and_tabs(line.split('=')[1]))
 			if VALUE == "":
-				VSyntaxError(self.line_number, f'tried to assign nothing to \'{self.declaration["BuiltIn"]}:{VALUE}\'')
+				VSyntaxError(self.line_number,
+							 f'tried to assign nothing to \'{self.declaration["BuiltIn"]}\' with value {VALUE}').throw()
 			for builtin in self.BuiltIns:
 				if NAME.lower() == builtin:
-					self.globals[f'{self.declaration["BuiltIn"]}:{NAME}'] = VALUE
+					self.globals[f'{self.declaration["BuiltIn"]}{NAME}'] = VALUE
+					print(self.globals)
 					break
 			else:
-				VSyntaxError(self.line_number, f'\'$\' doesn\'t have {NAME}')
+				VSyntaxError(self.line_number, f'\'$\' doesn\'t have {NAME}').throw()
 
 		elif self.declaration['if'] in first:
 			statement = line[line.find(self.declaration['if']) + len(self.declaration['if']):line.find(')') + 1]
@@ -496,7 +509,7 @@ class Code:
 
 		elif self.declaration['print'] in first:
 			PRINT = line.split(self.declaration['print'])[1].lstrip(':')
-			print("CODE  | ", self.eval(PRINT))
+			self.print("CODE  | " + str(self.eval(PRINT)))
 
 		elif self.declaration['exit'] in first:
 			GracefulExit(self.line_number)
@@ -508,7 +521,11 @@ class Code:
 			self.exec(FUNCTION)
 
 		elif self.remove_spaces_and_tabs(line) != "":
-			VSyntaxError(self.line_number, line)
+			VSyntaxError(self.line_number, line).add_note('test 1 2 3')
+
+	@staticmethod
+	def print(text):
+		cprint(text, 'blue')
 
 	def get_commands(self):
 		"""get all possible commands!"""
@@ -522,25 +539,92 @@ class Code:
 		return text
 
 
+class Logger:
+
+	def __init__(self, filename, auth:bool = True):
+		"""
+		creates object of class logger, that can save,log and read stuff from files.  \n
+		- filename - path to file/name of file. if file doesn't exists it will create new
+		  (doesn't work when path is given).
+		- auth - when usuing logs it will hash text, date, etc. if not used it will hash only number
+		"""
+		self.filename = filename
+		self.auth = auth
+
+	def decode(self, text: str):
+		"""decodes using base64"""
+		return b64decode(bytes(text, 'utf-8')).decode('utf-8')
+
+	def encode(self, text):
+		"""encodes str using base64"""
+		return b64encode(bytes(text, 'utf-8')).decode('utf-8')
+
+	def log(self, text):
+		"""writes to file text ( if auth in creation was True text will be hashed else it will write text you gave)"""
+		with open(self.filename, 'a', encoding='utf-8') as file:
+			if self.auth: file.write('[' + self.encode(str(datetime.datetime.now())) + '] >> {' + self.encode(text) + '}\n')
+			else:
+				primitave_auth = self.encode(len(file.read().split("\n")))
+				file.write(f'>{primitave_auth}<' + '[' + str(datetime.datetime.now()) + '] >> {' + text + '}\n')
+
+	def get_logs(self, only_valid=False, Warn_invalid=False, warn_for_missing=False):
+		"""
+		returns logs from file used to create this object.  \n
+
+		- only_valid - it will return only valid logs
+		- Warn_invalid - it will also return invalid logs
+		- warn_for_missing - it will return list of numbers of lines of logs, that are missing
+
+		returns List, List( if warn_invalid is True), List (if warn_for_missing is True)
+		"""
+		logs = []
+		with open(self.filename, 'r', encoding='utf-8') as file:
+			logs = file.read().split('\n')
+		for num, log in enumerate(logs):
+			if log.rstrip('\n') != '':
+				try:
+					date = self.decode(log.split('[')[1].split(']')[0])
+					text = self.decode(log.split('{')[1].split('}')[0])
+					logs[num] = '[' + date + '] >> {' + text + '}'
+				except:
+					logs[num] = "INVALID DATA"
+
+		warn_logs = []
+		inv_logs = []
+		if self.auth or only_valid or Warn_invalid:
+			for log in logs:
+				if self.auth:
+					if Warn_invalid:
+						if log[0] != '[' or ']' not in log or '>>' not in log or '{' not in log or '}' not in log:
+							warn_logs.append(log)
+
+		return '\n'.join(logs)
+
+
+
 class Web:
 	__slots__ = [
 		'app',
 		'code',
-		'debug'
+		'debug',
+		'logger'
 	]
 
-	def __init__(self, connect_to_server: bool = False, code: Code = Code(""), debug: bool = False):
+	def __init__(self, connect_to_server: bool = False, code: Code = Code(""), provide_logger=None,
+				 debug: bool = False):
 		"""Flask object to run code, so you will just need to create code for assistant and save time."""
+		if isinstance(provide_logger, Logger):
+			self.logger = provide_logger
+		else:
+			self.logger = None
 		self.debug: bool = debug
 		if connect_to_server is False:
-			print(dirname(__file__))
 			self.app = Flask(
 				abspath(__file__),
 				root_path=dirname(__file__),
 				template_folder="",
 				static_folder=""
 			)
-			self.print_all()
 			self.code = code
 		else:
 			pass
@@ -563,6 +647,7 @@ class Web:
 		"""
 		runs welcome page with the documentation!
 		In this mode you can't make voice assistants and any other things similar as it does not provide to do it :(
+		But you can create pull request for it! :)
 		"""
 
 		@self.app.route('/docs', methods=['GET'])
@@ -584,7 +669,7 @@ class Web:
 				self.code.setup_new_code(code)
 				self.code.run()
 			except:
-				print("Err: " + str(self.code.line_number), str(), sep="=:")
+				cprint("Err: " + str(self.code.line_number), 'orange')
 			stdout = old_stdout  # Put the old stream back in place
 			whatWasPrinted = buffer.getvalue()
 			print(whatWasPrinted)
@@ -597,7 +682,13 @@ class Web:
 
 		self.app.run(host=host, port=port, debug=debug)
 
-	def run(self, host, port, debug: bool = False, HTML_PAGE=None, ssl_certificate=None):
+	def run(self, host='127.0.0.1', port=5000, debug: bool = False, HTML_PAGE=None, ssl_certificate=None):
+		"""
+		Runs assistant with basic html page that can be customizable! \n
+
+		That custom page will need to:  \n
+		- send text to - /cmd with data {'TEXT': COMMAND}
+		"""
 		global stdout
 		if HTML_PAGE is None:
 			path = abspath(__file__)[len(self.app.root_path) + 1:__file__.rfind('\\')]
@@ -627,14 +718,15 @@ class Web:
 		@self.app.route('/', methods=['GET', 'POST'])
 		def execute():
 			try:
-				return render_template(HTML_PAGE, output=whatWasPrinted, COMMANDS=str(COMMANDS))
+				return render_template(HTML_PAGE, output=whatWasPrinted, COMMANDS=str(COMMANDS),
+									   name=self.code.globals[self.code.replacement['BuiltIn'] + 'name'])
 			except Exception as Exc:
 				return "Error " + str(Exc)
 
 		@self.app.route('/cmd', methods=['GET', 'POST'])
 		def cmd():
 			TEXT = request.form['TEXT']
-			print(TEXT)
+			if isinstance(self.logger, Logger): self.logger.log(TEXT)
 			return self.code.get_response(TEXT)
 
 		self.app.run(host=host, port=port, debug=debug, ssl_context=ssl_certificate)
