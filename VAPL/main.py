@@ -201,7 +201,7 @@ class Code:
 			self.replacement = {'BuiltIn': 'BuiltIn__'}
 			self.BuiltIns = {
 				'name': 'VAPL',
-				'ignore': None,
+				'ignore': [],
 			}
 
 			def execute(src):
@@ -209,7 +209,7 @@ class Code:
 
 			self.globals = {'execute': execute, 'eval': self.eval}
 			for BI in self.BuiltIns:
-				self.globals[str(self.replacement['BuiltIn']) + BI] = self.BuiltIns[BI]
+				self.globals[self.replacement['BuiltIn'] + BI.lower()] = self.BuiltIns[BI]
 			self.locals = {}
 
 		if IS_PATH is True or IS_PATH == 1:
@@ -491,8 +491,7 @@ class Code:
 							 f'tried to assign nothing to \'{self.declaration["BuiltIn"]}\' with value {VALUE}').throw()
 			for builtin in self.BuiltIns:
 				if NAME.lower() == builtin:
-					self.globals[f'{self.declaration["BuiltIn"]}{NAME}'] = VALUE
-					print(self.globals)
+					self.globals[f'{self.declaration["BuiltIn"]}{NAME.lower()}'] = VALUE
 					break
 			else:
 				VSyntaxError(self.line_number, f'\'$\' doesn\'t have {NAME}').throw()
@@ -718,8 +717,9 @@ class Web:
 		@self.app.route('/', methods=['GET', 'POST'])
 		def execute():
 			try:
+				print(self.code.globals[self.code.replacement['BuiltIn'] + 'name'])
 				return render_template(HTML_PAGE, output=whatWasPrinted, COMMANDS=str(COMMANDS),
-									   name=self.code.globals[self.code.replacement['BuiltIn'] + 'name'])
+									   NAME=self.code.globals[self.code.replacement['BuiltIn'] + 'name'])
 			except Exception as Exc:
 				return "Error " + str(Exc)
 
