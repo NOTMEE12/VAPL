@@ -100,8 +100,10 @@ class VTypeError(BasicError):
 		super().__init__(num, "You forgot the type of the variable.", "Typ-e", name="TypeError")
 
 
+
 class DivisionByZero(BasicError):
 	def __init__(self, num): super().__init__(num, "You can't divide by zero.", "Div-0")
+
 
 
 class VSyntaxError(BasicError):
@@ -137,7 +139,6 @@ class Code:
 	__slots__ = [
 		'code',
 		'line_number',
-		'declaration',
 		'globals',
 		'locals',
 		'modules',
@@ -148,26 +149,35 @@ class Code:
 		'BuiltIns',
 		'replacement'
 	]
+	declaration = {
+		'function': 'define',
+		'variable': 'var',
+		'print': 'out',
+		'BuiltIn': '$:',
+		'if': 'if',
+		'else': 'else',
+		'then': 'then',
+		'exit': 'exit',
+		'module': '#[',
+		'call': 'call',
+		'for': 'for',
+		'while': 'while',
+		'in': 'in',
+		'as': 'as',
+		'break': 'break',
+		'1-line-comment-start': '%:',
+		'm-line-comment-start': '%=',
+		'm-line-comment-end': '=%',
+		'path-start': '/*',
+		'path-end': '*/'
+	}
 
 	def __init__(self, SCRIPT_OR_PATH, IS_PATH: bool or int = False, debug=False):
+		"""
+		Code class that allows to create Voice Assistants using custom language!
+		Using Web class you can create
+		"""
 		self.setup_new_code(SCRIPT_OR_PATH, IS_PATH, debug)
-		self.declaration = {
-			'function': 'define',
-			'variable': 'var',
-			'print': 'out',
-			'BuiltIn': '$:',
-			'if': 'if',
-			'else': 'else',
-			'then': 'then',
-			'exit': 'exit',
-			'module': '#[',
-			'call': 'call',
-			'1-line-comment-start': '%:',
-			'm-line-comment-start': '%=',
-			'm-line-comment-end': '=%',
-			'path-start': '/*',
-			'path-end': '*/'
-		}
 
 	def eval(self, expression):
 		try:
@@ -201,7 +211,7 @@ class Code:
 			self.replacement = {'BuiltIn': 'BuiltIn__'}
 			self.BuiltIns = {
 				'name': 'VAPL',
-				'ignore': [],
+				'ignore': []
 			}
 
 			def execute(src):
@@ -352,13 +362,13 @@ class Code:
 
 	def exclude_comments(self):
 		text = self.code
-		Start, End = self.declaration['m-line-comment-start'], self.declaration['m-line-comment-start']
+		Start, End = self.declaration['m-line-comment-start'], self.declaration['m-line-comment-end']
 		output = sub("%s(.*?)%s" % (escape(Start.replace("\n", "/=n")), escape(End.replace("\n", "/=n"))), "",
 					 text.replace("\n", "/=n")).replace("/=n", "\n")
 		Start = self.declaration['1-line-comment-start']
 		End = "\n"
 		output = sub("%s(.*?)%s" % (escape(Start.replace("\n", "/=n")), escape(End.replace("\n", "/=n"))), "",
-					 text.replace("\n", "/=n")).replace("/=n", "\n")
+					 output.replace("\n", "/=n")).replace("/=n", "\n")
 		self.code = output
 
 	def run(self, AllowGracefulError=True):
@@ -403,7 +413,7 @@ class Code:
 
 	def loop_for_more_context(self, text, char1, char2):
 		while char1 not in text or char2 not in text or text.count(char1) != text.count(char2):
-			text += '\n' + self.remove_spaces_and_tabs(self.next_line())
+			text += self.remove_spaces_and_tabs(self.next_line())
 		return text
 
 	def next_line(self):
@@ -464,10 +474,26 @@ class Code:
 					CONVERT += f"{par} = PARS[{num}]\n"
 					RECONVERT += f"del {par}\n"
 			# CONVERT, RECONVERT = "", ""
-			BASE_FUNCTION = \
-				f"""def {NAME} (*PARS):\n{CONVERT}\n  execute('''{CODE}''')\n{RECONVERT}	
-			"""
+			BASE_FUNCTION = f"""def {NAME} (*PARS):\n{CONVERT}\n  execute('''{CODE}''')\n{RECONVERT}"""
 			self.exec(BASE_FUNCTION)
+
+		elif self.declaration['break'] in first:
+			try:
+				exit()
+			except: pass
+
+		elif self.declaration['for'] in first:
+			line: str = self.loop_for_more_context(line, '(', ')')
+			NAME_ITER = line[line.find('('): line.rfind(')')]
+			NAME = NAME_ITER.split(';')[0]
+			NAME = NAME.split(self.declaration['variable'])[1]
+			ITER = NAME_ITER.split(';')[1]
+			CODE = self.loop_for_more_context(line, '{', '}')
+			CODE = CODE[CODE.find('{'): CODE.rfind('}')]
+			self.exec(f'''for {NAME} in {ITER}:execute("""{CODE}""")''')
+
+		elif self.declaration['while'] in first:
+			pass
 
 		elif self.declaration['variable'] in first:
 			NAME = self.remove_spaces_and_tabs(
