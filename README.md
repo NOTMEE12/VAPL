@@ -38,19 +38,29 @@ web = VAPL.Web(False)
 web.run('127.0.0.1', 81)
 ```
 ### code.vapl
-```
-var your_name = []
 
-define SetName(NAME) {
-	if (NAME in your_name) then {
-		your_name = NAME
-		out: f"Hello {NAME}!"
-	} else {  %: if user was here
-		out: f"Welcome back {NAME}!"
-	}
+
+```shell
+%: BuiltIn Module
+#[VAPL.Modules.Web] > redirect, tts
+%; WHEN USING Speech To text it will ignore the name and $ignore
+%: But name will be displayed as title
+$name = 'bob'
+$ignore = ['hej']
+call: tts(f'Hello, I am {$name} Vapl.')
+out: 'I am the voice assistant made in custom language.'
+out: 'You can too!'
+out: 'Search for VAPL in testpypi or pypi!'
+out: ''
+define spotify(){
+	call: tts('Otwieram spotify')
+	call: redirect('https://open.spotify.com/collection/tracks')
 }
+
 /*
-"I am (NAME)" ;> call: SetName(NAME)
-"my name is (NAME)" ;> call: SetName(NAME)
+'zdrastwujtie' ;> call: tts(f'zdrastwujtie')
+'daswidania'  ;> call: tts(f'daswidania')
+f'inicjalizuj {$name}' ;> call: tts(f'initializacja programu {$name}')
+'otwórz spotify' ;> call: spotify()
 */
 ```
