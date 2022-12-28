@@ -3,7 +3,7 @@ function delay(MS) { return new Promise(resolve => { setTimeout(() => { resolve(
 async function DangerousShowText(id, text, delayMS=700){
 	TARGET = document.getElementById(id)
 	// shows text! can execute malicious code!
-	let AlreadyDone = ""
+	/*let AlreadyDone = ""
 	let tag = ''
 	for (const letter of Array(text)) {
 		if (letter != '<'){
@@ -17,5 +17,6 @@ async function DangerousShowText(id, text, delayMS=700){
 			tag += letter
 		}
 	}
-	TARGET.innerHTML = AlreadyDone
+	*/
+	TARGET.innerHTML = text
 }

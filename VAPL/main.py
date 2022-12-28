@@ -315,9 +315,12 @@ class Code:
 		def match(text1, text2):
 			return int(SequenceMatcher(None, text1, text2).ratio() * 100)
 
-		print(self.eval('$ignore'))
+		name = self.eval('$name').lower()
+
+		UserInput = self.remove_spaces_and_tabs(UserInput.lower())
+
 		for strip in self.eval('$ignore'):
-			UserInput = UserInput.lstrip(strip).lstrip(self.eval('$name')).lstrip(strip)
+			UserInput = UserInput.lstrip(strip.lower()).lstrip().lstrip(name).lstrip().lstrip(strip.lower())
 		print(UserInput)
 		HIGHEST = {'payload': None, 'r': 0}
 		MINIMUM = 90
@@ -353,7 +356,7 @@ class Code:
 				print("Executing command " + HIGHEST['payload']['text'])
 				self.execute(HIGHEST['payload']['code'], AllowGracefulExit=False)
 				sys.stdout = old_stdout  # Put the old stream back in place
-				whatWasPrinted = buffer.getvalue()
+				whatWasPrinted = buffer.getvalue().replace('[34m', '').replace('[0m', '')
 				return whatWasPrinted
 		else:
 			print("No commands found")
@@ -713,10 +716,23 @@ class Web:
 
 	def run(self, host='127.0.0.1', port=5000, debug: bool = False, HTML_PAGE=None, ssl_certificate=None):
 		"""
-		Runs assistant with basic html page that can be customizable! \n
+
+		Runs assistant with basic html page that can be customizable!  \n
+		--------------------
 
 		That custom page will need to:  \n
 		- send text to - /cmd with data {'TEXT': COMMAND}
+		- use innerHTML or something similar to get the output and visualize it to user.
+		- **{{COMMANDS.replace('&lt;', '<').replace('&gt;', '>') | safe}}** - for list of commands
+		- **{{name}}** - references to BuiltIn **$name**
+		- **{{output}}** - everything that got printed during run will be visualized
+		- **{{rows}}** - returns the length of rows that text has
+		- **{{cols}}** - returns the highest amount of columns on one line
+		* look good ;)
+		-----------------------------------
+
+		COMMANDS will be in <ul> <li> tags
+
 		"""
 		if HTML_PAGE is None:
 			path = abspath(__file__)[len(self.app.root_path) + 1:__file__.rfind('\\')]
@@ -736,7 +752,12 @@ class Web:
 		except Exception as err:
 			print("Err: " + str(self.code.line_number), str(err), sep="=:")
 		sys.stdout = old_stdout  # Put the old stream back in place
-		whatWasPrinted = buffer.getvalue()
+		whatWasPrinted = buffer.getvalue().replace('[34m', '').replace('[0m', '').rstrip('\n')
+		Cols = 0
+		for chars in whatWasPrinted.split('\n'):
+			if len(chars) > Cols:
+				Cols = len(chars)
+		Rows = len(whatWasPrinted.split('\n'))
 		PRE_COMMANDS = self.code.get_commands()
 		COMMANDS = "<ul>"
 		for command in PRE_COMMANDS:
@@ -747,7 +768,8 @@ class Web:
 		def execute():
 			try:
 				return render_template(HTML_PAGE, output=whatWasPrinted, COMMANDS=str(COMMANDS),
-									   NAME=self.code.globals[self.code.replacement['BuiltIn'] + 'name'])
+									   NAME=self.code.globals[self.code.replacement['BuiltIn'] + 'name'],
+									   rows=Rows, cols=Cols)
 			except Exception as Exc:
 				return "Error " + str(Exc)
 
