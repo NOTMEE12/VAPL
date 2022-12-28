@@ -747,10 +747,11 @@ class Web:
 		old_stdout = sys.stdout  # Memorize the default stdout stream
 		sys.stdout = buffer = StringIO()
 		try:
-			self.code.setup_new_code(code)
 			self.code.run()
-		except Exception as err:
-			print("Err: " + str(self.code.line_number), str(err), sep="=:")
+		except:
+			sys.stdout = old_stdout  # Put the old stream back in place
+			print(buffer.getvalue())
+			exit()
 		sys.stdout = old_stdout  # Put the old stream back in place
 		whatWasPrinted = buffer.getvalue().replace('[34m', '').replace('[0m', '').rstrip('\n')
 		Cols = 0
