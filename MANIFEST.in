@@ -1,3 +1,3 @@
-include VAPL/FEModules/*
+include VAPL/Modules/*
 include VAPL/static/*
 include VAPL/templates/*

@@ -4,7 +4,7 @@ from re import sub, escape
 from difflib import SequenceMatcher
 from os.path import abspath, dirname
 import ast
-from sys import stdout
+import sys
 import datetime
 from base64 import b64encode, b64decode
 from termcolor import cprint
@@ -31,7 +31,6 @@ Version = '0.0.115'
 # Mdc-M >> ModuleDoesntContainsThat :> User tries to import something that package does not provide
 # Mis-p >> MissingParameter			:> parameter not given to function from modules
 #   									(since in VAPL interpreter doesn't care)
-
 
 class BasicError:
 	notes = []
@@ -80,12 +79,12 @@ class BasicError:
 			   f'\n{" "*8}' + f'\n{" "*8}'.join(self.notes)
 
 
-class IllegalVariableName(BasicError):
-	def __init__(self, num, context=None): super().__init__(num, "Illegal Character in variable name", "Ill-v", context)
+# class IllegalVariableName(BasicError):
+# 	def __init__(self, num, context=None): super().__init__(num, "Illegal Character in variable name", "Ill-v", context)
 
 
-class IllegalFunctionName(BasicError):
-	def __init__(self, num, context=None): super().__init__(num, "Illegal Character in function name", "Ill-f", context)
+# class IllegalFunctionName(BasicError):
+# 	def __init__(self, num, context=None): super().__init__(num, "Illegal Character in function name", "Ill-f", context)
 
 
 class EvaluationError(BasicError):
@@ -100,10 +99,8 @@ class VTypeError(BasicError):
 		super().__init__(num, "You forgot the type of the variable.", "Typ-e", name="TypeError")
 
 
-
 class DivisionByZero(BasicError):
 	def __init__(self, num): super().__init__(num, "You can't divide by zero.", "Div-0")
-
 
 
 class VSyntaxError(BasicError):
@@ -146,14 +143,12 @@ class Code:
 		'rawCode',
 		'exit',
 		'debug',
-		'BuiltIns',
-		'replacement'
 	]
 	declaration = {
 		'function': 'define',
 		'variable': 'var',
 		'print': 'out',
-		'BuiltIn': '$:',
+		'BuiltIn': '$',
 		'if': 'if',
 		'else': 'else',
 		'then': 'then',
@@ -169,7 +164,14 @@ class Code:
 		'm-line-comment-start': '%=',
 		'm-line-comment-end': '=%',
 		'path-start': '/*',
-		'path-end': '*/'
+		'path-end': '*/',
+	}
+	replacement = {
+		'BuiltIn': 'BuiltIn__'
+	}
+	BuiltIns = {
+		'name': 'VAPL',
+		'ignore': []
 	}
 
 	def __init__(self, SCRIPT_OR_PATH, IS_PATH: bool or int = False, debug=False):
@@ -181,24 +183,24 @@ class Code:
 
 	def eval(self, expression):
 		try:
-			_expr = ast.parse(self.remove_spaces_and_tabs(expression.replace(self.declaration['BuiltIn'],
-														  self.replacement['BuiltIn'])),
-							  '<expression>', mode='eval')
+			expression = self.remove_spaces_and_tabs(expression.replace(self.declaration['BuiltIn'],
+																 self.replacement['BuiltIn']))
+			_expr = ast.parse(expression, '<expression>', mode='eval')
 			for node in ast.walk(_expr):
 				if isinstance(node, ast.Str):
 					node.s = node.s.replace(self.replacement['BuiltIn'], self.declaration['BuiltIn'])
 			COMPILE = compile(_expr, '<expression>', 'eval')
 			return eval(expression, self.globals, self.locals)
 		except ZeroDivisionError:
-			DivisionByZero(self.line_number)
+			DivisionByZero(self.line_number).throw()
 		except TypeError as Type:
-			VTypeError(self.line_number).add_note(str(Type))
+			VTypeError(self.line_number).add_note(str(Type)).throw()
 		except SyntaxError as syntax:
-			VSyntaxError(self.line_number, str(syntax)+'::'+expression)
+			VSyntaxError(self.line_number, str(syntax)+'::'+expression).throw()
 		except NameError:
-			NameNotKnown(self.line_number)
+			NameNotKnown(self.line_number).throw()
 		except Exception as exc:
-			EvaluationError(self.line_number, str(exc) + '::'+expression)
+			EvaluationError(self.line_number, str(exc) + '::'+expression).throw()
 
 	def setup_new_code(self, SCRIPT_OR_PATH, IS_PATH: bool or int = False, debug=False):
 		"""setups new code that can be run using run method."""
@@ -208,32 +210,28 @@ class Code:
 			self.modules = []
 			self.line_number = 0
 			self.debug = debug
-			self.replacement = {'BuiltIn': 'BuiltIn__'}
-			self.BuiltIns = {
-				'name': 'VAPL',
-				'ignore': []
-			}
 
-			def execute(src):
-				self.QuickSetupAndRun(src, AllowGracefulExit=False)
+			def execute(src): self.execute(src, AllowGracefulExit=False) # SIMILAR TO 'exec' BUT FOR VAPL
 
 			self.globals = {'execute': execute, 'eval': self.eval}
 			for BI in self.BuiltIns:
-				self.globals[self.replacement['BuiltIn'] + BI.lower()] = self.BuiltIns[BI]
+				Type = type(self.BuiltIns[BI])
+				self.globals[self.replacement['BuiltIn'] + BI.lower()]: Type = self.BuiltIns[BI]
 			self.locals = {}
 
 		if IS_PATH is True or IS_PATH == 1:
 			file = open(SCRIPT_OR_PATH, 'r', encoding='utf-8')
 			self.code = file.read()
-			self.rawCode = self.code
 			file.close()
 			setup()
 		else:
 			self.code = SCRIPT_OR_PATH
-			self.rawCode = self.code
 			setup()
 
-	def QuickSetupAndRun(self, code, IS_FILEPATH=False, AllowGracefulExit=True):
+		self.rawCode = self.code  # IF YOU WANT TO GET SOURCE CODE OF YOUR PROGRAM
+		self.code += '\n'  # SOME ERRORS AREN'T RAISED WHEN THIS ISN'T USED
+
+	def execute(self, code, IS_FILEPATH=False, AllowGracefulExit=True):
 		"""
 		Setups new code, runs it and changes it back to old. \n
 		Difference is that it saves and runs new code WITH old globals and locals variables, functions, paths,  etc.
@@ -313,19 +311,20 @@ class Code:
 		(if none were configured then it would return "COMMANDS NOT FOUND")\n
 		:return: str
 		"""
-		global stdout
 
 		def match(text1, text2):
 			return int(SequenceMatcher(None, text1, text2).ratio() * 100)
 
-		UserInput = UserInput
+		print(self.eval('$ignore'))
+		for strip in self.eval('$ignore'):
+			UserInput = UserInput.lstrip(strip).lstrip(self.eval('$name')).lstrip(strip)
+		print(UserInput)
 		HIGHEST = {'payload': None, 'r': 0}
 		MINIMUM = 90
 		self.debug_print("GETTING RESPONSE")
 		self.debug_print(end="")
 		self.debug_print(self.paths, sep="\n", end="")
 		for PATH in self.paths:
-			print(PATH['text'])
 			CMD_LEN = len(PATH['text'].rstrip().split(' '))
 			CMD = PATH['text'].lower().rstrip().lstrip()
 			UserInputCMD = ' '.join(UserInput.rstrip().split(' ')[0: CMD_LEN])
@@ -348,12 +347,12 @@ class Code:
 				return "Parameters not given. Try again later with parameters!"
 			else:
 				INPUT_PARAM = self.eval(INPUT_PARAM)
-				old_stdout = stdout  # Memorize the default stdout stream
-				stdout = buffer = StringIO()
+				old_stdout = sys.stdout  # Memorize the default stdout stream
+				sys.stdout = buffer = StringIO()
 				self.locals[HIGHEST['payload']['param']] = INPUT_PARAM
 				print("Executing command " + HIGHEST['payload']['text'])
-				self.execute_line(HIGHEST['payload']['code'])
-				stdout = old_stdout  # Put the old stream back in place
+				self.execute(HIGHEST['payload']['code'], AllowGracefulExit=False)
+				sys.stdout = old_stdout  # Put the old stream back in place
 				whatWasPrinted = buffer.getvalue()
 				return whatWasPrinted
 		else:
@@ -387,41 +386,43 @@ class Code:
 
 	def exec(self, code):
 		try:
-			code = ast.parse(code, '<string>', mode='exec')
+			code = ast.parse(code.replace(self.declaration['BuiltIn'], self.replacement['BuiltIn']),
+							 '<string>', mode='exec')
 			for node in ast.walk(code):
 				if isinstance(node, ast.Str):
 					node.s = node.s.replace(self.replacement['BuiltIn'], self.declaration['BuiltIn'])
 			code = compile(code, '<string>', 'exec')
 			exec(code, self.globals, self.locals)
 		except NameError:
-			NameNotKnown(self.line_number)
+			NameNotKnown(self.line_number).throw()
 		except ModuleNotFoundError as err:
-			MissingModule(self.line_number, err)
+			MissingModule(self.line_number, err).throw()
 		except ImportError as Iee:
-			print(Iee)
-			ModuleDoesntContainThat(self.line_number, Iee, Iee)
-		except SyntaxError:
-			VSyntaxError(self.line_number, 'Check your syntax!')
+			ModuleDoesntContainThat(self.line_number, Iee, Iee).add_note(f'PYError: {Iee}').throw()
+		except SyntaxError as synt:
+			VSyntaxError(self.line_number, 'Check your syntax!')\
+				.add_note(f"PYError: {synt}")\
+				.add_note(f"CODE: {code}")\
+				.throw()
 		except TypeError as Type:
-			print(Type)
 			if not str(Type).startswith("unsupported operand type(s) for"):
 				FUNC = str(Type).split(' ')[0]
-				PARAMS = ''#str(Type).split(':')[1]
-				MissingParameter(self.line_number, FUNC, PARAMS)
+				PARAMS = str(Type).split(':')[1]
+				MissingParameter(self.line_number, FUNC, PARAMS).add_note(f'PYError: {Type}').throw()
 			else:
-				VTypeError(self.line_number)
+				VTypeError(self.line_number).add_note(f"PYError: {Type}").throw()
 
 	def loop_for_more_context(self, text, char1, char2):
 		while char1 not in text or char2 not in text or text.count(char1) != text.count(char2):
-			text += self.remove_spaces_and_tabs(self.next_line())
+			text += '\n' + self.remove_spaces_and_tabs(self.next_line())
 		return text
 
 	def next_line(self):
 		"""DO NOT USE!!!"""
-		if self.line_number + 1 < len(self.code):
+		if self.line_number+1 < len(self.code):
 			self.line_number += 1
-		line = self.code[self.line_number]
-		return '\n' + line
+		line = '\n' + self.code[self.line_number]
+		return line
 
 	def execute_line(self, line: str):
 		"""
@@ -429,7 +430,7 @@ class Code:
 		"""
 
 		def capture_missing_chars(char):
-			if char not in line: MissingChar(self.line_number, char)
+			if char not in line: MissingChar(self.line_number, char).throw()
 
 		first = self.remove_spaces_and_tabs(line).split(" ")[0]
 		line = self.remove_spaces_and_tabs(line)
@@ -493,7 +494,11 @@ class Code:
 			self.exec(f'''for {NAME} in {ITER}:execute("""{CODE}""")''')
 
 		elif self.declaration['while'] in first:
-			pass
+			line = self.loop_for_more_context(line, '(', ')')
+			line = self.loop_for_more_context(line, '{', '}')
+			STATEMENT = line[line.find('(')+1: line.split('}')[0].rfind(')')]
+			CODE = line[line.find('{')+1: line.rfind('}')]
+			self.exec(f'''while {STATEMENT}:execute("""{CODE}""")''')
 
 		elif self.declaration['variable'] in first:
 			NAME = self.remove_spaces_and_tabs(
@@ -504,8 +509,7 @@ class Code:
 					VALUE = None
 			else:
 				VALUE = None
-			# self.globals[NAME] = VALUE
-			self.exec(f"{NAME} = {VALUE}")
+			self.exec(f'{NAME} = {VALUE}')
 
 		elif self.declaration['BuiltIn'] in first:
 			NAME = self.remove_spaces_and_tabs(line.split('=')[0].lstrip(self.declaration['BuiltIn']))
@@ -517,7 +521,7 @@ class Code:
 							 f'tried to assign nothing to \'{self.declaration["BuiltIn"]}\' with value {VALUE}').throw()
 			for builtin in self.BuiltIns:
 				if NAME.lower() == builtin:
-					self.globals[f'{self.declaration["BuiltIn"]}{NAME.lower()}'] = VALUE
+					self.globals[f'{self.replacement["BuiltIn"]}{NAME.lower()}'] = VALUE
 					break
 			else:
 				VSyntaxError(self.line_number, f'\'$\' doesn\'t have {NAME}').throw()
@@ -534,7 +538,7 @@ class Code:
 
 		elif self.declaration['print'] in first:
 			PRINT = line.split(self.declaration['print'])[1].lstrip(':')
-			self.print("CODE  | " + str(self.eval(PRINT)))
+			self.print("CODE  | " + self.eval(PRINT))
 
 		elif self.declaration['exit'] in first:
 			GracefulExit(self.line_number)
@@ -546,7 +550,7 @@ class Code:
 			self.exec(FUNCTION)
 
 		elif self.remove_spaces_and_tabs(line) != "":
-			VSyntaxError(self.line_number, line).add_note('test 1 2 3')
+			VSyntaxError(self.line_number, line).throw()
 
 	@staticmethod
 	def print(text):
@@ -576,11 +580,13 @@ class Logger:
 		self.filename = filename
 		self.auth = auth
 
-	def decode(self, text: str):
+	@staticmethod
+	def decode(text: str):
 		"""decodes using base64"""
 		return b64decode(bytes(text, 'utf-8')).decode('utf-8')
 
-	def encode(self, text):
+	@staticmethod
+	def encode(text):
 		"""encodes str using base64"""
 		return b64encode(bytes(text, 'utf-8')).decode('utf-8')
 
@@ -624,7 +630,6 @@ class Logger:
 							warn_logs.append(log)
 
 		return '\n'.join(logs)
-
 
 
 class Web:
@@ -685,17 +690,16 @@ class Web:
 
 		@self.app.route('/code', methods=['get', 'post'])
 		def run():
-			global stdout
 			code = str(request.form['code'])
 			print(code)
-			old_stdout = stdout  # Memorize the default stdout stream
-			stdout = buffer = StringIO()
+			old_stdout = sys.stdout  # Memorize the default stdout stream
+			sys.stdout = buffer = StringIO()
 			try:
 				self.code.setup_new_code(code)
 				self.code.run()
 			except:
 				cprint("Err: " + str(self.code.line_number), 'orange')
-			stdout = old_stdout  # Put the old stream back in place
+			sys.stdout = old_stdout  # Put the old stream back in place
 			whatWasPrinted = buffer.getvalue()
 			print(whatWasPrinted)
 			return whatWasPrinted
@@ -714,7 +718,6 @@ class Web:
 		That custom page will need to:  \n
 		- send text to - /cmd with data {'TEXT': COMMAND}
 		"""
-		global stdout
 		if HTML_PAGE is None:
 			path = abspath(__file__)[len(self.app.root_path) + 1:__file__.rfind('\\')]
 			HTML_PAGE = "Executer.html"
@@ -725,14 +728,14 @@ class Web:
 			self.app.root_path = self.app.instance_path[0: self.app.instance_path.rfind('\\')]
 		self.print_all()
 		code = str(self.code.rawCode)
-		old_stdout = stdout  # Memorize the default stdout stream
-		stdout = buffer = StringIO()
+		old_stdout = sys.stdout  # Memorize the default stdout stream
+		sys.stdout = buffer = StringIO()
 		try:
 			self.code.setup_new_code(code)
 			self.code.run()
-		except:
-			print("Err: " + str(self.code.line_number), str(), sep="=:")
-		stdout = old_stdout  # Put the old stream back in place
+		except Exception as err:
+			print("Err: " + str(self.code.line_number), str(err), sep="=:")
+		sys.stdout = old_stdout  # Put the old stream back in place
 		whatWasPrinted = buffer.getvalue()
 		PRE_COMMANDS = self.code.get_commands()
 		COMMANDS = "<ul>"
@@ -743,7 +746,6 @@ class Web:
 		@self.app.route('/', methods=['GET', 'POST'])
 		def execute():
 			try:
-				print(self.code.globals[self.code.replacement['BuiltIn'] + 'name'])
 				return render_template(HTML_PAGE, output=whatWasPrinted, COMMANDS=str(COMMANDS),
 									   NAME=self.code.globals[self.code.replacement['BuiltIn'] + 'name'])
 			except Exception as Exc:
@@ -753,6 +755,6 @@ class Web:
 		def cmd():
 			TEXT = request.form['TEXT']
 			if isinstance(self.logger, Logger): self.logger.log(TEXT)
-			return self.code.get_response(TEXT)
+			return self.code.get_response(TEXT).replace('[34m', '<p>').replace('[0m', '</p>')
 
 		self.app.run(host=host, port=port, debug=debug, ssl_context=ssl_certificate)
