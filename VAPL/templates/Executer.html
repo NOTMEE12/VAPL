@@ -75,6 +75,18 @@
 	}
 	#OUT-TEXT {
 		white-space: pre-wrap;
+		background-color: #080808;
+		border-radius: 5px;
+		text-align: left;
+	}
+	#OUTPUT {
+		background-color: #060606;
+		resize: none;
+		font-family: monospace;
+		color: #BBB;
+		border-radius: 10px;
+		border-color: #050505;
+		outline: 0px;
 	}
 </style>
 <body>
@@ -100,6 +112,7 @@
 		<div class="code-output">
 			<h1>OUTPUT</h1>
 			<div id="OUT-TEXT"></div>
+			<textarea cols="{{cols}}" rows="{{rows}}" contenteditable="false" id="OUTPUT" spellcheck="false">{{output}}</textarea>
 		</div>
 	</div>
 	</body>

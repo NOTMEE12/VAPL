@@ -9,10 +9,12 @@ def html(text):
 	return
 
 
-def run_javascript(JS):
-	print(f'<style onload=\"{JS}\"\\>')
+def run_JS(JS):
+	"""PLEASE DON't USE '\n' IN LINES!"""
+	for line in JS.split('\n'):
+		print(f'<style onload=\"{JS}\"\\>')
 	return
 
 
 def tts(text):
-	return
+	run_JS()
