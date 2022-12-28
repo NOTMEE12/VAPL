@@ -8,7 +8,7 @@ import sys
 import datetime
 from base64 import b64encode, b64decode
 from termcolor import cprint
-Version = '0.0.115'
+Version = '1.0.1'
 
 
 # LIST OF ERRORS
@@ -724,7 +724,8 @@ class Web:
 		- use innerHTML or something similar to get the output and visualize it to user.
 		- **{{COMMANDS | safe}}** - for list of commands
 		- **{{name}}** - references to BuiltIn **$name**
-		- **{{output}}** - everything that got printed during run will be visualized
+		- **{{output | safe}}** - everything that got printed during run will be visualized.
+		  Needs *safe* because otherwise it wouldn't support TTS.
 		- **{{rows}}** - returns the length of rows that text has
 		- **{{cols}}** - returns the highest amount of columns on one line
 		- **{{SETUP | safe}}** - setups TTS (if device supports) needs tag *safe* because it will run JS code.
@@ -770,17 +771,11 @@ class Web:
 			var msg = new SpeechSynthesisUtterance();
 			msg.rate = 1;
 			msg.volume = 1;
-			var voices = window.speechSynthesis.getVoices();
-			function SetVoice(Voice){
-				msg.voice = voices[Voice]; 
-			}
-			SetVoice(10)
 			function say(text){
 				msg.text = text;
 				console.log(msg.text);
-				speechSynthesis.speak(msg);
+				window.speechSynthesis.speak(msg);
 			}
-			say();
 		} else {
 			alert("TTS not supported!\\nTHIS CAN RUN TO SOME ISSUES SO I SUGGEST TO USE 'out'");
 		}

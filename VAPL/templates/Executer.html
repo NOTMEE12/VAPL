@@ -88,6 +88,13 @@
 		border-color: #050505;
 		outline: 0px;
 	}
+	body {
+		margin: 0px;
+		padding: 0px;
+		background-color: #222222; /* VERY DARK GRAY */
+		color: #c2c2c7;
+		text-align: center;
+	}
 </style>
 <body>
 	<div class="GET" hidden>
@@ -113,7 +120,7 @@
 			<h1>OUTPUT</h1>
 			<div id="OUT-TEXT"></div>
 			<p></p>
-			<textarea cols="{{cols}}" rows="{{rows}}" contenteditable="false" id="OUTPUT" spellcheck="false">{{output}}</textarea>
+			<textarea cols="{{cols}}" rows="{{rows}}" contenteditable="false" id="OUTPUT" spellcheck="false">{{output | safe}}</textarea>
 		</div>
 	</div>
 	</body>
