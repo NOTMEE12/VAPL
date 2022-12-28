@@ -1,6 +1,6 @@
 
 def redirect(url):
-	print('<style onload=\"window.open(\'%s\', \'_blank\');\"\\>' % url)
+	print('<style onload=\"window.open(\'%s\', \'_blank\');\"\\> </style>' % url)
 	return
 
 
@@ -10,5 +10,5 @@ def html(text):
 
 
 def tts(text):
-	print(f'<style onload=\'say(\"{text}\")\'>')
+	print(f'<style onload=\'say(\"{text}\")\'></style>')
 	print(text)
