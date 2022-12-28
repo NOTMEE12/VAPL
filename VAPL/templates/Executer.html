@@ -105,7 +105,7 @@
 	<div>
 		<div class="command-block">
 			<h1>COMMANDS</h1>
-			<div id="OUT-CMD">{{COMMANDS.replace('&lt;', '<').replace('&gt;', '>') | safe}}</div>
+			<div id="OUT-CMD">{{COMMANDS | safe}}</div>
 			<br>
 			TEKST <a>PARAMETR</a>
 		</div>
@@ -231,6 +231,8 @@
 	}
 	// setInterval(getSpeech, 100)
 	
-	
-</script>
+	</script>
+	<script>
+		{{SETUP | safe}}
+	</script>
 </html>

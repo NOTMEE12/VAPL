@@ -321,7 +321,6 @@ class Code:
 
 		for strip in self.eval('$ignore'):
 			UserInput = UserInput.lstrip(strip.lower()).lstrip().lstrip(name).lstrip().lstrip(strip.lower())
-		print(UserInput)
 		HIGHEST = {'payload': None, 'r': 0}
 		MINIMUM = 90
 		self.debug_print("GETTING RESPONSE")
@@ -723,11 +722,12 @@ class Web:
 		That custom page will need to:  \n
 		- send text to - /cmd with data {'TEXT': COMMAND}
 		- use innerHTML or something similar to get the output and visualize it to user.
-		- **{{COMMANDS.replace('&lt;', '<').replace('&gt;', '>') | safe}}** - for list of commands
+		- **{{COMMANDS | safe}}** - for list of commands
 		- **{{name}}** - references to BuiltIn **$name**
 		- **{{output}}** - everything that got printed during run will be visualized
 		- **{{rows}}** - returns the length of rows that text has
 		- **{{cols}}** - returns the highest amount of columns on one line
+		- **{{SETUP | safe}}** - setups TTS (if device supports) needs tag *safe* because it will run JS code.
 		* look good ;)
 		-----------------------------------
 
@@ -764,13 +764,31 @@ class Web:
 		for command in PRE_COMMANDS:
 			COMMANDS += '<li>' + str(command['text']) + '<a>' + command['param'] + '</a>' + '<br>'
 		COMMANDS += "</ul>"
+		SETUP = """
+		if ('speechSynthesis' in window){
+			// SUPPORTED TTS
+			var msg = new SpeechSynthesisUtterance();
+			var voices = window.speechSynthesis.getVoices();
+			function SetVoice(Voice){
+				msg.voice = voices[Voice]; 
+			}
+			SetVoice(10)
+			function say(text){
+				msg.text = text
+				window.speechSynthesis.speak(msg)
+			}
+		} else {
+			alert("TTS not supported!\\nTHIS CAN RUN TO SOME ISSUES SO I SUGGEST TO USE 'out'")
+		}
+		"""
 
 		@self.app.route('/', methods=['GET', 'POST'])
 		def execute():
 			try:
 				return render_template(HTML_PAGE, output=whatWasPrinted, COMMANDS=str(COMMANDS),
 									   NAME=self.code.globals[self.code.replacement['BuiltIn'] + 'name'],
-									   rows=Rows, cols=Cols)
+									   rows=Rows, cols=Cols,
+									   SETUP=SETUP)
 			except Exception as Exc:
 				return "Error " + str(Exc)
 
