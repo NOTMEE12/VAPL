@@ -768,17 +768,21 @@ class Web:
 		if ('speechSynthesis' in window){
 			// SUPPORTED TTS
 			var msg = new SpeechSynthesisUtterance();
+			msg.rate = 1;
+			msg.volume = 1;
 			var voices = window.speechSynthesis.getVoices();
 			function SetVoice(Voice){
 				msg.voice = voices[Voice]; 
 			}
 			SetVoice(10)
 			function say(text){
-				msg.text = text
-				window.speechSynthesis.speak(msg)
+				msg.text = text;
+				console.log(msg.text);
+				speechSynthesis.speak(msg);
 			}
+			say();
 		} else {
-			alert("TTS not supported!\\nTHIS CAN RUN TO SOME ISSUES SO I SUGGEST TO USE 'out'")
+			alert("TTS not supported!\\nTHIS CAN RUN TO SOME ISSUES SO I SUGGEST TO USE 'out'");
 		}
 		"""
 

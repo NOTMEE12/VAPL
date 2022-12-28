@@ -10,4 +10,5 @@ def html(text):
 
 
 def tts(text):
-	print(f'<style onload=\'speak({text})\'')
+	print(f'<style onload=\'say(\"{text}\")\'>')
+	print(text)
