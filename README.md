@@ -47,7 +47,7 @@ web.run('127.0.0.1', 81)
 %: But name will be displayed as title
 $name = 'bob'
 $ignore = ['hej']
-call: tts(f'Hello, I am {$name} Vapl.')
+out: f'Hello, I am {$name} Vapl.'
 out: 'I am the voice assistant made in custom language.'
 out: 'You can too!'
 out: 'Search for VAPL in testpypi or pypi!'
