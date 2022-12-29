@@ -43,7 +43,7 @@ web.run('127.0.0.1', 81)
 ```shell
 %: BuiltIn Module
 #[VAPL.Modules.Web] > redirect, tts
-%; WHEN USING Speech To text it will ignore the name and $ignore
+%: WHEN USING Speech To text it will ignore the name and $ignore
 %: But name will be displayed as title
 $name = 'bob'
 $ignore = ['hej']
