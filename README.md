@@ -14,7 +14,7 @@
 ### ABOUT PATHS
 - starts with /* and ends with */
 - are basically list of instructions
-- when path is activated it will run code after ;>
+- when path is activated it will run code after ;> **ONLY ONE-LINE**
 - uses strings (WHEN TEXT IS IN BETWEEN '(' AND ')' IT CAN BE USED AS VARIABLE IN CODE)
 - example:
 ```
@@ -23,9 +23,15 @@ var HELLO = "hello (NAME)"
 HELLO	;> out: "hello " + NAME + "!"
 */
 ```
+### Builtin modules:
+- Web:
+	+ redirect ( url ) - redirects to a website
+	+ html ( HTML ) - runs html code 
+	+ tts ( text ) - TextToSpeech
+
 ## HOW TO INSTALL
 ```commandline
-pip install -i https://test.pypi.org/simple/ VAPL
+pip install VAPL
 ```
 
 ## CODE EXAMPLE
@@ -38,29 +44,27 @@ web = VAPL.Web(False)
 web.run('127.0.0.1', 81)
 ```
 ### code.vapl
-
-
 ```shell
 %: BuiltIn Module
 #[VAPL.Modules.Web] > redirect, tts
 %: WHEN USING Speech To text it will ignore the name and $ignore
 %: But name will be displayed as title
 $name = 'bob'
-$ignore = ['hej']
+$ignore = ['']
 out: f'Hello, I am {$name} Vapl.'
 out: 'I am the voice assistant made in custom language.'
-out: 'You can too!'
+out: 'You can make me too!'
 out: 'Search for VAPL in testpypi or pypi!'
 out: ''
 define spotify(){
-	call: tts('Otwieram spotify')
+	call: tts('opening spotify')
 	call: redirect('https://open.spotify.com/collection/tracks')
 }
 
 /*
-'zdrastwujtie' ;> call: tts(f'zdrastwujtie')
-'daswidania'  ;> call: tts(f'daswidania')
-f'inicjalizuj {$name}' ;> call: tts(f'initializacja programu {$name}')
-'otwórz spotify' ;> call: spotify()
+'hi' ;> call: tts(f'hi')
+'goodbye'  ;> call: tts('goodbye')
+f'initialize {$name}' ;> call: tts(f'initializacja programu {$name}')
+'open spotify' ;> call: spotify()
 */
 ```
