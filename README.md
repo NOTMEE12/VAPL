@@ -64,7 +64,7 @@ define spotify(){
 /*
 'hi' ;> call: tts(f'hi')
 'goodbye'  ;> call: tts('goodbye')
-f'initialize {$name}' ;> call: tts(f'initializacja programu {$name}')
+f'initialize {$name}' ;> call: tts(f'initializing {$name}')
 'open spotify' ;> call: spotify()
 */
 ```
