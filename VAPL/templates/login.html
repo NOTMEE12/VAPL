@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>login</title>
+</head>
+<style>
+  body {
+	  margin: 0px;
+	  padding: 0px;
+	  background-color: #222222; /* VERY DARK GRAY */
+	  color: #c2c2c7;
+	  text-align: center;
+	  display: flex;
+	  flex-direction: column;
+	  align-items: center;
+  }
+  input {
+  	border-radius: 7px;
+  	position: absolute;
+  	min-width: 200px;
+  	width: 20%;
+  	height: 5%;
+  	font-size: 1.9rem;
+  	background-color: #323232;
+  	color: #c2c2c7;
+  	border-right: 0;
+  }
+  input::placeholder {
+  	font-style: italic;
+  	color: #606065;
+  }
+  input:focus-visible {
+  	border-block-color: lightblue;
+	outline: none;
+	border-top: 0px;
+	border-left: 0px;
+	border-right: 0px;
+  }
+  form {
+  	display: flex;
+  	flex-direction: column;
+  }
+  h1 {
+  	position: fixed;
+  	top: 20%;
+  	font-size: 4rem;
+  }
+</style>
+<script>
+  function form_submit(){
+  	let password = document.getElementById('password').value;
+  	localStorage.setItem('password', password);
+  	window.location.href = window.location.href.replace('/login', '').replace('?', '') + '/?password='+password;
+  	console.log(window.location.href);
+  }
+</script>
+<body>
+	<h1>Zaloguj</h1>
+	<input id="password" type="password" placeholder="password" autocapitalize="none" autocomplete="none" style="top: 45%">
+	<input type="submit" value="login" onclick="form_submit()" style="top: 55%;font-size: 1.9rem;">
+</body>
+</html>

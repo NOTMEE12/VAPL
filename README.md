@@ -7,6 +7,8 @@
 - one-line comment start - ```%: TEXT```
 - multiple-lines comments - ```%= TEXT ... some lines ... this function... =%```
 - builtIn modules that can be accessed using ```#[NAME] > Import something > As something```
+- for loop - ```for ( var VARIABLE; ITERATOR ) { CODE }```
+- while loop - ```while ( STATEMENT ) { CODE }```
 - if-then-else - ```if(STATEMENT) (optional - then )  { CODE }```
 - PATHS
 - running functions and some other actions - ```call: x+=1; test(x)```

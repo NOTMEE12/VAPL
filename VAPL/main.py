@@ -1,3 +1,4 @@
+from threading import Thread
 from flask import Flask, render_template, request, make_response
 from io import StringIO
 from re import sub, escape
@@ -8,6 +9,16 @@ import sys
 import datetime
 from base64 import b64encode, b64decode
 from termcolor import cprint
+try:
+	import colorama
+	colorama.init(True)
+	RED = colorama.Fore.RED
+	LGREEN = colorama.Fore.LIGHTGREEN_EX
+	GREEN = colorama.Fore.GREEN
+	YELLOW = colorama.Fore.YELLOW
+	RESET = colorama.Fore.RESET
+except:
+	RED, LGREEN, GREEN, YELLOW, RESET = ''
 Version = '1.0.1'
 
 
@@ -299,13 +310,21 @@ class Code:
 						CODE
 				}
 				self.paths.append(payload)
+			else:
+				self.paths.append(
+					{
+						'text': PATH,
+						'param': '',
+						'code': ''
+					}
+				)
 
 	def debug_print(self, *values, sep="", end='\n'):
 		"""print function for debugging!"""
 		if self.debug: print(str(values).lstrip('(').rstrip(')').replace(',', sep)
 							 .lstrip("\'").lstrip('\"').rstrip("\'").rstrip('\"'), end)
 
-	def get_response(self, UserInput: str) -> str:
+	def get_response(self, UserInput: str, listen=True) -> str:
 		"""
 		Returns response using UserInput and paths configured before \n
 		(if none were configured then it would return "COMMANDS NOT FOUND")\n
@@ -317,49 +336,64 @@ class Code:
 
 		name = self.eval('$name').lower()
 
-		UserInput = self.remove_spaces_and_tabs(UserInput.lower())
+		UserWholeInput = self.remove_spaces_and_tabs(UserInput.lower())
+
+		if name in UserWholeInput:
+			UserWholeInput = self.remove_spaces_and_tabs(UserWholeInput.split(name)[1])
 
 		for strip in self.eval('$ignore'):
-			UserInput = UserInput.lstrip(strip.lower()).lstrip().lstrip(name).lstrip().lstrip(strip.lower())
-		HIGHEST = {'payload': None, 'r': 0}
-		MINIMUM = 90
-		self.debug_print("GETTING RESPONSE")
-		self.debug_print(end="")
-		self.debug_print(self.paths, sep="\n", end="")
-		for PATH in self.paths:
-			CMD_LEN = len(PATH['text'].rstrip().split(' '))
-			CMD = PATH['text'].lower().rstrip().lstrip()
-			UserInputCMD = ' '.join(UserInput.rstrip().split(' ')[0: CMD_LEN])
-			R = match(UserInputCMD.lower(), CMD)
-			self.debug_print(f'ratio of [\"{CMD}\"]/[\"{UserInputCMD}\"] is {R}', end="")
-			if R > HIGHEST['r']:
-				HIGHEST['payload'] = PATH
-				HIGHEST['r'] = R
-		self.debug_print()
-		self.debug_print(HIGHEST, sep="\n", end="")
-		if HIGHEST['r'] >= MINIMUM:
-			CMD_LEN = len(HIGHEST['payload']['text'].split(' ')) - 1
-			CMD = HIGHEST['payload']['text'].lower()
-			UserInputCMD = ' '.join(UserInput.split(' ')[CMD_LEN: len(UserInput.split(' ')) + 1])
-			INPUT_PARAM = '"' + UserInputCMD + '"'
-			self.debug_print(f"INPUT_PARAM: |{INPUT_PARAM}| :")
-			if not INPUT_PARAM != "" and not HIGHEST['payload']['param'] != "":
-				print("Parameters not given.")
-				print("Try again.")
-				return "Parameters not given. Try again later with parameters!"
-			else:
+			UserWholeInput = UserWholeInput.lstrip(strip.lower()).lstrip().lstrip(name).lstrip().lstrip(strip.lower())
+		UserWords = UserWholeInput.split(' ')
+		for word_idx in range(len(UserWords)):
+			UserInput = ' '.join(UserWords[word_idx:])
+
+			HIGHEST = {'payload': None, 'r': 0}
+			MINIMUM = 80
+			self.debug_print("GETTING RESPONSE")
+			self.debug_print(end="")
+			self.debug_print(self.paths, sep="\n", end="")
+			for PATH in self.paths:
+				if self.remove_spaces_and_tabs(PATH['text']) == '':
+					continue
+				CMD_LEN = len(PATH['text'].rstrip().split(' '))
+				CMD = PATH['text'].lower().rstrip().lstrip()
+				UserInputCMD = ' '.join(UserInput.rstrip().split(' ')[0: CMD_LEN])
+				R = match(UserInputCMD.lower(), CMD)
+				self.debug_print(f'ratio of [\"{CMD}\"]/[\"{YELLOW}{UserInputCMD}{RESET}\"] is {RED if R < 25 else (YELLOW if R < MINIMUM else LGREEN)}{R}{RESET}', end="")
+				if R > HIGHEST['r']:
+					HIGHEST['payload'] = PATH
+					HIGHEST['r'] = R
+			self.debug_print()
+			self.debug_print(HIGHEST, sep="\n", end="")
+			if HIGHEST['r'] >= MINIMUM:
+				CMD_LEN = len(HIGHEST['payload']['text'].split(' ')) - 1
+				CMD = HIGHEST['payload']['text'].lower()
+				UserInputCMD = ' '.join(UserInput.split(' ')[CMD_LEN: len(UserInput.split(' ')) + 1])
+				INPUT_PARAM = '"' + UserInputCMD + '"'
+
 				INPUT_PARAM = self.eval(INPUT_PARAM)
-				old_stdout = sys.stdout  # Memorize the default stdout stream
-				sys.stdout = buffer = StringIO()
+
+				self.debug_print(f"INPUT_PARAM: |{INPUT_PARAM}| :")
+
+				if HIGHEST['payload']['param'] != "" and INPUT_PARAM == "":
+					return "Parameters not given. Try again later with parameters."
+
 				self.locals[HIGHEST['payload']['param']] = INPUT_PARAM
+				self.debug_print("Executing command " + HIGHEST['payload']['text'])
+				if listen:
+					old_stdout = sys.stdout  # Memorize the default stdout stream
+					sys.stdout = buffer = StringIO()
 				print("Executing command " + HIGHEST['payload']['text'])
-				self.execute(HIGHEST['payload']['code'], AllowGracefulExit=False)
-				sys.stdout = old_stdout  # Put the old stream back in place
-				whatWasPrinted = buffer.getvalue().replace('[34m', '').replace('[0m', '')
-				return whatWasPrinted
-		else:
-			print("No commands found")
-			return "No commands found"
+				try:
+					self.execute_line(HIGHEST['payload']['code'])
+				except Exception as exc:
+					print(f'Error happened during callback: {exc}')
+				if listen:
+					sys.stdout = old_stdout  # Put the old stream back in place
+					whatWasPrinted = buffer.getvalue().replace('[34m', '').replace('[0m', '')
+					return whatWasPrinted
+				return None
+		return "No commands found"
 
 	def exclude_comments(self):
 		text = self.code
@@ -413,6 +447,8 @@ class Code:
 				MissingParameter(self.line_number, FUNC, PARAMS).add_note(f'PYError: {Type}').throw()
 			else:
 				VTypeError(self.line_number).add_note(f"PYError: {Type}").throw()
+		except Exception as err:
+			EvaluationError(None, (code, err, type(err))).throw()
 
 	def loop_for_more_context(self, text, char1, char2):
 		while char1 not in text or char2 not in text or text.count(char1) != text.count(char2):
@@ -477,7 +513,7 @@ class Code:
 					CONVERT += f"{par} = PARS[{num}]\n"
 					RECONVERT += f"del {par}\n"
 			# CONVERT, RECONVERT = "", ""
-			BASE_FUNCTION = f"""def {NAME} (*PARS):\n{CONVERT}\n  execute('''{CODE}''')\n{RECONVERT}"""
+			BASE_FUNCTION = f"""def {NAME}({','.join(PARAMS.split(','))}):\n\texecute('''{CODE}''')"""
 			self.exec(BASE_FUNCTION)
 
 		elif self.declaration['break'] in first:
@@ -486,13 +522,16 @@ class Code:
 			except: pass
 
 		elif self.declaration['for'] in first:
+			"""
+			for(NAME; ITER){CODE}
+			"""
 			line: str = self.loop_for_more_context(line, '(', ')')
 			NAME_ITER = line[line.find('('): line.rfind(')')]
 			NAME = NAME_ITER.split(';')[0]
 			NAME = NAME.split(self.declaration['variable'])[1]
 			ITER = NAME_ITER.split(';')[1]
 			CODE = self.loop_for_more_context(line, '{', '}')
-			CODE = CODE[CODE.find('{'): CODE.rfind('}')]
+			CODE = CODE[CODE.find('{')+1: CODE.rfind('}')]
 			self.exec(f'''for {NAME} in {ITER}:execute("""{CODE}""")''')
 
 		elif self.declaration['while'] in first:
@@ -540,7 +579,7 @@ class Code:
 
 		elif self.declaration['print'] in first:
 			PRINT = line.split(self.declaration['print'])[1].lstrip(':')
-			self.print("CODE  | " + self.eval(PRINT))
+			self.print("CODE  | " + str(self.eval(PRINT)))
 
 		elif self.declaration['exit'] in first:
 			GracefulExit(self.line_number)
@@ -595,10 +634,10 @@ class Logger:
 	def log(self, text):
 		"""writes to file text ( if auth in creation was True text will be hashed else it will write text you gave)"""
 		with open(self.filename, 'a', encoding='utf-8') as file:
-			if self.auth: file.write('[' + self.encode(str(datetime.datetime.now())) + '] >> {' + self.encode(text) + '}\n')
+			if self.auth:
+				file.write('[' + self.encode(str(datetime.datetime.now())) + '] >> {' + self.encode(text) + '}\n')
 			else:
-				primitave_auth = self.encode(len(file.read().split("\n")))
-				file.write(f'>{primitave_auth}<' + '[' + str(datetime.datetime.now()) + '] >> {' + text + '}\n')
+				file.write('[' + str(datetime.datetime.now()) + '] >> {' + text + '}\n')
 
 	def get_logs(self, only_valid=False, Warn_invalid=False, warn_for_missing=False):
 		"""
@@ -713,7 +752,7 @@ class Web:
 
 		self.app.run(host=host, port=port, debug=debug)
 
-	def run(self, host='127.0.0.1', port=5000, debug: bool = False, HTML_PAGE=None, ssl_certificate=None):
+	def run(self, host='127.0.0.1', port=5000, debug: bool = False, static_folder=None, template_folder=None, use_custom_HTML=False, ssl_certificate=None, additional_js_code="", password=None, path_splitter='\\'):
 		"""
 
 		Runs assistant with basic html page that can be customizable!  \n
@@ -735,14 +774,19 @@ class Web:
 		COMMANDS will be in <ul> <li> tags
 
 		"""
-		if HTML_PAGE is None:
-			path = abspath(__file__)[len(self.app.root_path) + 1:__file__.rfind('\\')]
-			HTML_PAGE = "Executer.html"
+		HTML_PAGE = "Executer.html"
+		LOGIN_PAGE = 'login.html'
+		PAGE_NOT_FOUND_PAGE = 'PageNotFound.html'
+		if use_custom_HTML is False:
+			path = abspath(__file__)[len(self.app.root_path) + 1:__file__.rfind(path_splitter)]
 			self.app.static_folder = "static"
 			self.app.template_folder = "templates"
 			del path
 		else:
-			self.app.root_path = self.app.instance_path[0: self.app.instance_path.rfind('\\')]
+			self.app.root_path = self.app.instance_path[0: self.app.instance_path.rfind(path_splitter)]
+			self.app.static_folder = static_folder
+			self.app.template_folder = template_folder
+
 		self.print_all()
 		code = str(self.code.rawCode)
 		old_stdout = sys.stdout  # Memorize the default stdout stream
@@ -755,6 +799,8 @@ class Web:
 			exit()
 		sys.stdout = old_stdout  # Put the old stream back in place
 		whatWasPrinted = buffer.getvalue().replace('[34m', '').replace('[0m', '').rstrip('\n')
+		self.debug_print(whatWasPrinted)
+
 		Cols = 0
 		for chars in whatWasPrinted.split('\n'):
 			if len(chars) > Cols:
@@ -763,6 +809,9 @@ class Web:
 		PRE_COMMANDS = self.code.get_commands()
 		COMMANDS = "<ul>"
 		for command in PRE_COMMANDS:
+			if self.code.remove_spaces_and_tabs(command['text']) == '':
+				COMMANDS += '<br>'
+				continue
 			COMMANDS += '<li>' + str(command['text']) + '<a>' + command['param'] + '</a>' + '<br>'
 		COMMANDS += "</ul>"
 		SETUP = """
@@ -778,23 +827,56 @@ class Web:
 			}
 		} else {
 			alert("TTS not supported!\\nTHIS CAN RUN TO SOME ISSUES SO I SUGGEST TO USE 'out'");
-		}
+		}\n
 		"""
+		# PASSWORD_CODE = "if (localStorage.getItem(\"password\") != \"%s\"){window.open(\'/\', \'_blank\');};\n" % password
+		# if password is not None:
+		# 	SETUP += PASSWORD_CODE
+		if additional_js_code:
+			SETUP += additional_js_code
+		self.debug_print('\n' + str(command))
+
+		@self.app.route('/api/credentials', methods=['GET'])
+		def check_credentials():
+			# print(request.form['password'])
+			return 'True' if request.values.get('password') == password else 'False'
+
+		@self.app.route('/login', methods=['GET', 'POST'])
+		def login():
+			return render_template(LOGIN_PAGE)
 
 		@self.app.route('/', methods=['GET', 'POST'])
 		def execute():
 			try:
-				return render_template(HTML_PAGE, output=whatWasPrinted, COMMANDS=str(COMMANDS),
-									   NAME=self.code.globals[self.code.replacement['BuiltIn'] + 'name'],
-									   rows=Rows, cols=Cols,
-									   SETUP=SETUP)
+				if (not (request.values.get('password') == password or request.form.get('password') == password)) and password is not None:
+					return self.app.redirect('/login')
+				return render_template(
+					HTML_PAGE,
+					output=whatWasPrinted, COMMANDS=str(COMMANDS),
+					NAME=self.code.globals[self.code.replacement['BuiltIn'] + 'name'],
+					rows=Rows, cols=Cols,
+					SETUP=SETUP
+				)
 			except Exception as Exc:
 				return "Error " + str(Exc)
 
-		@self.app.route('/cmd', methods=['GET', 'POST'])
+		@self.app.errorhandler(404)
+		def PageNotFound(url):
+			url = request.base_url.lstrip("http://").lstrip('https://').lstrip(request.host).lstrip('/')
+			return make_response(render_template(PAGE_NOT_FOUND_PAGE, URL=url), 404)
+
+		@self.app.route('/api/command', methods=['GET', 'POST'])
 		def cmd():
+			if request.form['password'] != password:
+				return 'invalid credentials'
 			TEXT = request.form['TEXT']
-			if isinstance(self.logger, Logger): self.logger.log(TEXT)
-			return self.code.get_response(TEXT).replace('[34m', '<p>').replace('[0m', '</p>')
+			cprint('GOT: '+ TEXT, 'green')
+			if isinstance(self.logger, Logger):
+				self.logger.log(TEXT)
+			response = self.code.get_response(TEXT, not debug)
+			if response is None:
+				response = ""
+			cprint('PROGRAM RESPONSE: ' + response, 'yellow')
+			return response.replace('[34m', '<p>').replace('[0m', '</p>')
 
 		self.app.run(host=host, port=port, debug=debug, ssl_context=ssl_certificate)
